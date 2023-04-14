@@ -21,7 +21,10 @@ typedef struct {
 	Cube *                    cube;
 	Movable                   ind[MAX_N_COORD];
 	Step *                    s;
-	AlgList *                 sols;
+	Trans                     t;
+	SolutionType              st;
+	int *                     nsols;
+	Alg *                     sols;
 	int                       d;
 	int                       bound;
 	bool                      can_niss;
@@ -32,6 +35,7 @@ typedef struct {
 	Alg *                     current_alg;
 } DfsArg;
 
+static void        append_sol(DfsArg *arg);
 static bool        allowed_next(Move move, Step *s, Move l0, Move l1);
 static void        compute_ind(DfsArg *arg);
 static void        copy_dfsarg(DfsArg *src, DfsArg *dst);
@@ -40,6 +44,7 @@ static void        dfs(DfsArg *arg);
 static void        dfs_niss(DfsArg *arg);
 static bool        dfs_move_checkstop(DfsArg *arg);
 static bool        niss_makes_sense(DfsArg *arg);
+static bool        singlecwend(Alg *alg);
 
 Step eofb_HTM = {
 	.shortname      = "eofb",
@@ -66,6 +71,21 @@ Step drfin_drud = {
 };
 
 Step *steps[] = { &eofb_HTM, &drud_HTM, &drfin_drud, NULL };
+
+static void
+append_sol(DfsArg *arg)
+{
+	int i;
+
+	copy_alg(arg->current_alg, &arg->sols[*arg->nsols]);
+	transform_alg(inverse_trans(arg->t), &arg->sols[*arg->nsols]);
+
+	if (arg->st == INVERSE)
+		for (i = 0; i < arg->sols[*arg->nsols].len; i++)
+			arg->sols[*arg->nsols].inv[i] = true;
+
+	(*arg->nsols)++;
+}
 
 static bool
 allowed_next(Move m, Step *s, Move l0, Move l1)
@@ -97,11 +117,14 @@ copy_dfsarg(DfsArg *src, DfsArg *dst)
 
 	dst->cube        = src->cube;
 	dst->s           = src->s;
+	dst->t           = src->t;
+	dst->st          = src->st;
 	dst->d           = src->d;
 	dst->bound       = src->bound; /* In theory not needed */
 	dst->can_niss    = src->can_niss;
 	dst->niss        = src->niss;
 	dst->has_nissed  = src->has_nissed;
+	dst->nsols       = src->nsols;
 	dst->sols        = src->sols;
 	dst->current_alg = src->current_alg;
 
@@ -139,15 +162,17 @@ dfs(DfsArg *arg)
 {
 	Move m;
 	DfsArg newarg;
+	bool len, singlecw, niss;
 
 	if (dfs_move_checkstop(arg))
 		return;
 
 	if (arg->bound == 0) {
-		if (arg->current_alg->len == arg->d &&
-		    singlecwend(arg->current_alg) &&
-		    (!arg->can_niss || arg->has_nissed))
-			append_alg(arg->sols, arg->current_alg);
+		len = arg->current_alg->len == arg->d;
+		singlecw = singlecwend(arg->current_alg);
+		niss = !arg->can_niss || arg->has_nissed;
+		if (len && singlecw && niss)
+			append_sol(arg);
 		return;
 	}
 
@@ -171,35 +196,38 @@ dfs(DfsArg *arg)
 static void
 dfs_niss(DfsArg *arg)
 {
+	int i;
 	DfsArg newarg;
-	Alg *inv;
-	Cube *c;
+	Cube c, newcube;
+	Move aux;
 
 	copy_dfsarg(arg, &newarg);
 
 	/* Invert current alg and scramble */
-	newarg.cube = malloc(sizeof(Cube));
-	inv = inverse_alg(arg->current_alg);
-	c = malloc(sizeof(Cube));
+	newarg.cube = &newcube;
+
 	make_solved(newarg.cube);
-	apply_alg(inv, newarg.cube);
-	copy_cube(arg->cube, c);
-	invert_cube(c);
-	compose(c, newarg.cube);
+	apply_alg(arg->current_alg, newarg.cube);
+	invert_cube(newarg.cube);
+
+	copy_cube(arg->cube, &c);
+	invert_cube(&c);
+	compose(&c, newarg.cube);
 
 	/* New indexes */
 	compute_ind(&newarg);
 
-	swapmove(&(newarg.last[0]), &(newarg.lastinv[0]));
-	swapmove(&(newarg.last[1]), &(newarg.lastinv[1]));
+	/* Swap last moves */
+	for (i = 0; i < 2; i++) {
+		aux = newarg.last[i];
+		newarg.last[i] = newarg.lastinv[i];
+		newarg.lastinv[i] = aux;
+	}
+
 	newarg.niss = !(arg->niss);
 	newarg.has_nissed = true;
 
 	dfs(&newarg);
-
-	free_alg(inv);
-	free(c);
-	free(newarg.cube);
 }
 
 static bool
@@ -231,31 +259,54 @@ static bool
 niss_makes_sense(DfsArg *arg)
 {
 	Cube testcube;
+	DfsArg aux;
 
 	if (arg->niss || !arg->can_niss || arg->current_alg->len == 0)
 		return false;
 
 	make_solved(&testcube);
 	apply_move(inverse_move(arg->last[0]), &testcube);
-	return estimate_step(arg->s, arg->ind) > 0;
+	aux.cube = &testcube;
+	aux.s = arg->s;
+	/* TODO: refactor compute_ind so we don't need full arg */
+	compute_ind(&aux);
+
+	return estimate_step(aux.s, aux.ind) > 0;
+}
+
+bool
+singlecwend(Alg *alg)
+{
+	int i;
+	bool nor, inv;
+	Move l2 = NULLMOVE, l1 = NULLMOVE, l2i = NULLMOVE, l1i = NULLMOVE;
+
+	for (i = 0; i < alg->len; i++) {
+		if (alg->inv[i]) {
+			l2i = l1i;
+			l1i = alg->move[i];
+		} else {
+			l2 = l1;
+			l1 = alg->move[i];
+		}
+	}
+
+	nor = l1 ==base_move(l1)  && (!commute(l1, l2) ||l2 ==base_move(l2));
+	inv = l1i==base_move(l1i) && (!commute(l1i,l2i)||l2i==base_move(l2i));
+
+	return nor && inv;
 }
 
 /* Public functions **********************************************************/
 
-AlgList *
-solve(Cube *cube, char *stepstr, int m, SolutionType st, Trans t)
+int
+solve(Cube *cube, char *stepstr, int m, SolutionType st, Trans t, Alg *sol)
 {
-	int i;
-	AlgList *sols;
-	AlgListNode *node;
+	int i, n;
+	Alg alg;
 	Cube c;
 	DfsArg arg;
 	Step *step;
-
-	/* TODO: checks for steps being ready and not solved are
-		 done somewhere else */
-
-	sols = new_alglist();
 
 	/* Prepare step TODO: remove all initialization! */
 	step = NULL;
@@ -264,7 +315,7 @@ solve(Cube *cube, char *stepstr, int m, SolutionType st, Trans t)
 			step = steps[i];
 	if (step == NULL) {
 		fprintf(stderr, "No step to solve!\n");
-		return sols;
+		return 0;
 	}
 	PDGenData pdg;
 	pdg.moveset = step->moveset;
@@ -283,6 +334,9 @@ solve(Cube *cube, char *stepstr, int m, SolutionType st, Trans t)
 		}
 	}
 
+	alg.len = 0;
+	n = 0;
+
 	/* Prepare cube for solve */
 	arg.cube = &c;
 	copy_cube(cube, arg.cube);
@@ -291,8 +345,11 @@ solve(Cube *cube, char *stepstr, int m, SolutionType st, Trans t)
 	apply_trans(t, arg.cube);
 	arg.s           = step;
 	compute_ind(&arg);
+	arg.t           = t;
+	arg.st          = st;
 	arg.can_niss    = st == NISS;
-	arg.sols        = sols;
+	arg.nsols       = &n;
+	arg.sols        = sol;
 	arg.d           = m;
 	arg.niss        = false;
 	arg.has_nissed  = false;
@@ -300,17 +357,10 @@ solve(Cube *cube, char *stepstr, int m, SolutionType st, Trans t)
 	arg.last[1]     = NULLMOVE;
 	arg.lastinv[0]  = NULLMOVE;
 	arg.lastinv[1]  = NULLMOVE;
-	arg.current_alg = new_alg("");
+	arg.current_alg = &alg;
 
 	dfs(&arg);
-	
-	for (node = sols->first; node != NULL; node = node->next) {
-		transform_alg(inverse_trans(t), node->alg);
-		if (st == INVERSE)
-			for (i = 0; i < node->alg->len; i++)
-				node->alg->inv[i] = true;
-	}
 
-	return sols;
+	return n;
 }
 

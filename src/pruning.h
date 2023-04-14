@@ -23,6 +23,13 @@ typedef struct {
 	PruneData *               pd;
 } PDGenData;
 
+bool        allowed_all(Move m);
+bool        allowed_HTM(Move m);
+bool        allowed_URF(Move m);
+bool        allowed_eofb(Move m);
+bool        allowed_drud(Move m);
+bool        allowed_htr(Move m);
+
 void        free_pd(PruneData *pd);
 PruneData * genptable(PDGenData *data);
 void        print_ptable(PruneData *pd);

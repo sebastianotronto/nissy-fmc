@@ -15,6 +15,44 @@ static bool        write_ptable_file(PruneData *pd);
 
 PDGenData *active_pdg[256];
 
+bool
+allowed_HTM(Move m)
+{
+	return m >= U && m <= B3;
+}
+
+bool
+allowed_URF(Move m)
+{
+	Move b = base_move(m);
+
+	return b == U || b == R || b == F;
+}
+
+bool
+allowed_eofb(Move m)
+{
+	Move b = base_move(m);
+
+	return b == U || b == D || b == R || b == L ||
+		((b == F || b == B) && m == b+1);
+}
+
+bool
+allowed_drud(Move m)
+{
+	Move b = base_move(m);
+
+	return b == U || b == D ||
+		((b == R || b == L || b == F || b == B) && m == b + 1);
+}
+
+bool
+allowed_htr(Move m)
+{
+	return allowed_HTM(m) && m == base_move(m) + 1;
+}
+
 PruneData *
 genptable(PDGenData *pdg)
 {

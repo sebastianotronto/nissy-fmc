@@ -1,44 +1,15 @@
 #include "solve.h"
 
-static Alg *
-read_scramble(int c, char **v)
-{
-	int i, k, n;
-	unsigned int j;
-	char *algstr;
-	Alg *scr;
-
-	if (c < 1) {
-		fprintf(stderr, "Error: no scramble given\n");
-		return false;
-	}
-
-	for(n = 0, i = 0; i < c; i++)
-		n += strlen(v[i]);
-
-	algstr = malloc((n + 1) * sizeof(char));
-	k = 0;
-	for (i = 0; i < c; i++)
-		for (j = 0; j < strlen(v[i]); j++)
-			algstr[k++] = v[i][j];
-	algstr[k] = 0;
-
-	scr = new_alg(algstr);
-
-	free(algstr);
-
-	return scr;
-}
+#define MAX_SOLS 999
 
 int
 main(int argc, char *argv[])
 {
-	int i, m;
+	int i, m, n;
 	long val;
-	Alg *scramble;
-	AlgList *sols;
 	Cube c;
 	SolutionType t;
+	Alg sols[999];
 
 	if (argc < 2) {
 		fprintf(stderr, "Not enough arguments given\n");
@@ -47,7 +18,6 @@ main(int argc, char *argv[])
 
 	m = 0;
 	t = NORMAL;
-	scramble = new_alg("");
 
 	init_env();
 	init_cube();
@@ -69,17 +39,23 @@ main(int argc, char *argv[])
 		}
 	}
 
-	scramble = read_scramble(argc - i, &argv[i]);
-	if (scramble->len <= 0) {
-		fprintf(stderr, "Cannot read scramble\n");
+	if (i == argc) {
+		fprintf(stderr, "No scramble given\n");
 		return 4;
 	}
 
 	make_solved(&c);
-	apply_alg(scramble, &c);
-	sols = solve(&c, argv[1], m, t, uf); /* TODO: trans */
-	print_alglist(sols);
-	free_alglist(sols);
+	if (!apply_scramble(argv[i], &c)) {
+		fprintf(stderr, "Invalid scramble: %s\n", argv[i]);
+		return 5;
+	}
+
+	n = solve(&c, argv[1], m, t, uf, sols); /* TODO: trans */
+	for (i = 0; i < n; i++) {
+		char buf[66];
+		int l = alg_string(&sols[i], buf);
+		printf("%s (%d)\n", buf, l);
+	}
 
 	return 0;
 }

@@ -2,10 +2,9 @@
 #define SOLVE_H
 
 #include "pruning.h"
-#include "alg.h"
 
 typedef enum { NORMAL, INVERSE, NISS } SolutionType;
 
-AlgList *solve(Cube *cube, char *stepstr, int m, SolutionType st, Trans t);
+int solve(Cube *cube, char *step, int m, SolutionType st, Trans t, Alg *sol);
 
 #endif
