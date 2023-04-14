@@ -1,11 +1,11 @@
 #ifndef SOLVE_H
 #define SOLVE_H
 
-#include "moves.h"
-#include "steps.h"
-#include "trans.h"
+#include "pruning.h"
+#include "alg.h"
 
-AlgList *   solve(Cube *cube, Step *step, SolveOptions *opts);
-Alg *       solve_2phase(Cube *cube, int nthreads);
+typedef enum { NORMAL, INVERSE, NISS } SolutionType;
+
+AlgList *solve(Cube *cube, char *stepstr, int m, SolutionType st, Trans t);
 
 #endif

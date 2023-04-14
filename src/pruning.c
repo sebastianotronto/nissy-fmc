@@ -5,35 +5,21 @@
 #define ENTRIES_PER_GROUP              (2*sizeof(entry_group_t))
 #define ENTRIES_PER_GROUP_COMPACT      (4*sizeof(entry_group_t))
 
-static int         findchunk(PruneData *pd, int nchunks, uint64_t i);
-static void        genptable_bfs(PruneData *pd, int d, int nt, int nc);
+static void        genptable_bfs(PruneData *pd, int d);
+static void        fixnasty(PruneData *pd, uint64_t i, int d);
 static void        genptable_compress(PruneData *pd);
-static void        genptable_fixnasty(PruneData *pd, int d, int nthreads);
 static void        genptable_setbase(PruneData *pd);
-static void *      instance_bfs(void *arg);
-static void *      instance_fixnasty(void *arg);
 static void        ptable_update(PruneData *pd, uint64_t ind, int m);
 static bool        read_ptable_file(PruneData *pd);
 static bool        write_ptable_file(PruneData *pd);
 
 PDGenData *active_pdg[256];
 
-int
-findchunk(PruneData *pd, int nchunks, uint64_t i)
-{
-	uint64_t chunksize;
-
-	chunksize = pd->coord->max / (uint64_t)nchunks;
-	chunksize += ENTRIES_PER_GROUP - (chunksize % ENTRIES_PER_GROUP);
-
-	return MIN(nchunks-1, (int)(i / chunksize));
-}
-
 PruneData *
-genptable(PDGenData *pdg, int nthreads)
+genptable(PDGenData *pdg)
 {
 	bool compact;
-	int d, nchunks, i;
+	int d, i;
 	uint64_t oldn, sz;
 	PruneData *pd;
 
@@ -59,25 +45,11 @@ genptable(PDGenData *pdg, int nthreads)
 	if (read_ptable_file(pd))
 		goto genptable_done;
 
-	if (nthreads < 4) {
-		fprintf(stderr,
-			"--- Warning ---\n"
-			"You are using only %d threads to generate the pruning"
-			"tables. This can take a while.\n"
-			"Unless you did this intentionally, you should re-run"
-			"this command with `-t 4' or more.\n"
-			"---------------\n\n", nthreads
-		);
-	}
-
-
 	/* For the first steps we proceed the same way for compact and not */
 	compact = pd->compact;
 	pd->compact = false;
 
-	nchunks = MIN(ptablesize(pd), 100000);
-	fprintf(stderr, "Generating pt_%s_%s with %d threads\n",
-			pd->coord->name, pd->moveset->name, nthreads); 
+	fprintf(stderr, "Generating pt_%s\n", pd->coord->name); 
 
 	memset(pd->ptable, ~(uint8_t)0, ptablesize(pd)*sizeof(entry_group_t));
 	for (i = 0; i < 16; i++)
@@ -86,15 +58,14 @@ genptable(PDGenData *pdg, int nthreads)
 	ptable_update(pd, 0, 0);
 	pd->n = 1;
 	oldn = 0;
-	genptable_fixnasty(pd, 0, nthreads);
+	fixnasty(pd, 0, 0);
 	fprintf(stderr, "Depth %d done, generated %"
 		PRIu64 "\t(%" PRIu64 "/%" PRIu64 ")\n",
 		0, pd->n - oldn, pd->n, pd->coord->max);
 	oldn = pd->n;
 	pd->count[0] = pd->n;
 	for (d = 0; d < 15 && pd->n < pd->coord->max; d++) {
-		genptable_bfs(pd, d, nthreads, nchunks);
-		genptable_fixnasty(pd, d+1, nthreads);
+		genptable_bfs(pd, d);
 		fprintf(stderr, "Depth %d done, generated %"
 			PRIu64 "\t(%" PRIu64 "/%" PRIu64 ")\n",
 			d+1, pd->n - oldn, pd->n, pd->coord->max);
@@ -122,37 +93,45 @@ genptable_done:
 }
 
 static void
-genptable_bfs(PruneData *pd, int d, int nthreads, int nchunks)
+genptable_bfs(PruneData *pd, int d)
 {
-	int i;
-	pthread_t t[nthreads];
-	ThreadDataGenpt td[nthreads];
-	pthread_mutex_t *mtx[nchunks], *upmtx;
+	uint64_t i, ii;
+	int pval;
+	Move m;
 
-	upmtx = malloc(sizeof(pthread_mutex_t));
-	pthread_mutex_init(upmtx, NULL);
-	for (i = 0; i < nchunks; i++) {
-		mtx[i] = malloc(sizeof(pthread_mutex_t));
-		pthread_mutex_init(mtx[i], NULL);
+	for (i = 0; i < pd->coord->max; i++) {
+		pval = ptableval(pd, i);
+		if (pval != d)
+			continue;
+		for (m = U; m <= B3; m++) {
+			if (!pd->moveset(m))
+				continue;
+			ii = move_coord(pd->coord, m, i, NULL);
+			ptable_update(pd, ii, d+1);
+			fixnasty(pd, ii, d+1);
+		}
 	}
+}
 
-	for (i = 0; i < nthreads; i++) {
-		td[i].thid     = i;
-		td[i].nthreads = nthreads;
-		td[i].pd       = pd;
-		td[i].d        = d;
-		td[i].nchunks  = nchunks;
-		td[i].mutex    = mtx;
-		td[i].upmutex  = upmtx;
-		pthread_create(&t[i], NULL, instance_bfs, &td[i]);
+static void
+fixnasty(PruneData *pd, uint64_t i, int d)
+{
+	uint64_t ii, ss, M;
+	int j;
+	Trans t;
+
+	if (pd->coord->type != SYMCOMP_COORD)
+		return;
+
+	M = pd->coord->base[1]->max;
+	ss = pd->coord->base[0]->selfsim[i/M];
+	for (j = 0; j < pd->coord->base[0]->tgrp->n; j++) {
+		t = pd->coord->base[0]->tgrp->t[j];
+		if (t == uf || !(ss & ((uint64_t)1<<t)))
+			continue;
+		ii = trans_coord(pd->coord, t, i);
+		ptable_update(pd, ii, d);
 	}
-
-	for (i = 0; i < nthreads; i++)
-		pthread_join(t[i], NULL);
-
-	free(upmtx);
-	for (i = 0; i < nchunks; i++)
-		free(mtx[i]);
 }
 
 static void
@@ -181,34 +160,6 @@ genptable_compress(PruneData *pd)
 }
 
 static void
-genptable_fixnasty(PruneData *pd, int d, int nthreads)
-{
-	int i;
-	pthread_t t[nthreads];
-	ThreadDataGenpt td[nthreads];
-	pthread_mutex_t *upmtx;
-
-	if (pd->coord->type != SYMCOMP_COORD)
-		return;
-
-	upmtx = malloc(sizeof(pthread_mutex_t));
-	pthread_mutex_init(upmtx, NULL);
-	for (i = 0; i < nthreads; i++) {
-		td[i].thid     = i;
-		td[i].nthreads = nthreads;
-		td[i].pd       = pd;
-		td[i].d        = d;
-		td[i].upmutex  = upmtx;
-		pthread_create(&t[i], NULL, instance_fixnasty, &td[i]);
-	}
-
-	for (i = 0; i < nthreads; i++)
-		pthread_join(t[i], NULL);
-
-	free(upmtx);
-}
-
-static void
 genptable_setbase(PruneData *pd)
 {
 	int i;
@@ -224,99 +175,12 @@ genptable_setbase(PruneData *pd)
 	}
 }
 
-static void *
-instance_bfs(void *arg)
-{
-	ThreadDataGenpt *td;
-	uint64_t i, ii, blocksize, rmin, rmax, updated;
-	int j, pval, ichunk;
-	Move *ms;
-
-	td = (ThreadDataGenpt *)arg;
-	ms = td->pd->moveset->sorted_moves;
-	blocksize = td->pd->coord->max / (uint64_t)td->nthreads;
-	rmin = ((uint64_t)td->thid) * blocksize;
-	rmax = td->thid == td->nthreads - 1 ?
-	       td->pd->coord->max :
-	       ((uint64_t)td->thid + 1) * blocksize;
-
-	updated = 0;
-	for (i = rmin; i < rmax; i++) {
-		ichunk = findchunk(td->pd, td->nchunks, i);
-		pthread_mutex_lock(td->mutex[ichunk]);
-		pval = ptableval(td->pd, i);
-		pthread_mutex_unlock(td->mutex[ichunk]);
-		if (pval == td->d) {
-			for (j = 0; ms[j] != NULLMOVE; j++) {
-				/* ii = td->pd->coord->move(ms[j], i); */
-				ii = move_coord(td->pd->coord, ms[j], i, NULL);
-				ichunk = findchunk(td->pd, td->nchunks, ii);
-				pthread_mutex_lock(td->mutex[ichunk]);
-				pval = ptableval(td->pd, ii);
-				if (pval > td->d+1) {
-					ptable_update(td->pd, ii, td->d+1);
-					updated++;
-				}
-				pthread_mutex_unlock(td->mutex[ichunk]);
-			}
-		}
-	}
-
-	pthread_mutex_lock(td->upmutex);
-	td->pd->n += updated;
-	pthread_mutex_unlock(td->upmutex);
-
-	return NULL;
-}
-
-static void *
-instance_fixnasty(void *arg)
-{
-	ThreadDataGenpt *td;
-	uint64_t i, ii, blocksize, rmin, rmax, updated, ss, M;
-	int j;
-	Trans t;
-
-	td = (ThreadDataGenpt *)arg;
-
-	/* We know type = SYMCOMP_COORD */
-	M = td->pd->coord->base[1]->max;
-	blocksize = (td->pd->coord->base[0]->max / td->nthreads) * M;
-	rmin = ((uint64_t)td->thid) * blocksize;
-	rmax = td->thid == td->nthreads - 1 ?
-	       td->pd->coord->max :
-	       ((uint64_t)td->thid + 1) * blocksize;
-
-	updated = 0;
-	for (i = rmin; i < rmax; i++) {
-		if (ptableval(td->pd, i) == td->d) {
-			ss = td->pd->coord->base[0]->selfsim[i/M];
-			for (j = 0; j < td->pd->coord->base[0]->tgrp->n; j++) {
-				t = td->pd->coord->base[0]->tgrp->t[j];
-				if (t == uf || !(ss & ((uint64_t)1<<t)))
-					continue;
-				ii = trans_coord(td->pd->coord, t, i);
-				if (ptableval(td->pd, ii) > td->d) {
-					ptable_update(td->pd, ii, td->d);
-					updated++;
-				}
-			}
-		}
-	}
-
-	pthread_mutex_lock(td->upmutex);
-	td->pd->n += updated;
-	pthread_mutex_unlock(td->upmutex);
-
-	return NULL;
-}
-
 void
 print_ptable(PruneData *pd)
 {
 	uint64_t i;
 
-	printf("Table %s_%s\n", pd->coord->name, pd->moveset->name);
+	printf("Table %s\n", pd->coord->name);
 	printf("Base value: %d\n", pd->base);
 	for (i = 0; i < 16; i++)
 		printf("%2" PRIu64 "\t%10" PRIu64 "\n", i, pd->count[i]);
@@ -339,12 +203,15 @@ ptable_update(PruneData *pd, uint64_t ind, int n)
 	entry_group_t mask;
 	uint64_t i;
 
+	if (ptableval(pd, ind) <= n)
+		return;
+
 	sh = 4 * (ind % ENTRIES_PER_GROUP);
 	mask = ((entry_group_t)15) << sh;
 	i = ind/ENTRIES_PER_GROUP;
-
 	pd->ptable[i] &= ~mask;
 	pd->ptable[i] |= (((entry_group_t)n)&15) << sh;
+	pd->n++;
 }
 
 int
@@ -382,8 +249,6 @@ read_ptable_file(PruneData *pd)
 	strcpy(fname, tabledir);
 	strcat(fname, "/pt_");
 	strcat(fname, pd->coord->name);
-	strcat(fname, "_");
-	strcat(fname, pd->moveset->name);
 
 	if ((f = fopen(fname, "rb")) == NULL)
 		return false;
@@ -411,8 +276,6 @@ write_ptable_file(PruneData *pd)
 	strcpy(fname, tabledir);
 	strcat(fname, "/pt_");
 	strcat(fname, pd->coord->name);
-	strcat(fname, "_");
-	strcat(fname, pd->moveset->name);
 
 	if ((f = fopen(fname, "wb")) == NULL)
 		return false;

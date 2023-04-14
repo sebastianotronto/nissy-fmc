@@ -2,6 +2,10 @@
 
 #include "env.h"
 
+typedef int bool;
+#define true 1
+#define false 0
+
 bool initialized_env = false;
 char *tabledir;
 

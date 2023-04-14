@@ -1,7 +1,33 @@
 #ifndef COORD_H
 #define COORD_H
 
-#include "trans.h"
+#include <inttypes.h>
+
+#include "cube.h"
+#include "env.h"
+
+typedef enum { COMP_COORD, SYM_COORD, SYMCOMP_COORD } CoordType;
+typedef struct {
+	int n;
+	uint64_t (*index)(Cube *);
+	void (*to_cube)(uint64_t, Cube *);
+} Indexer;
+typedef struct coordinate {
+	char *                    name;
+	CoordType                 type;
+	bool                      generated;
+	Indexer *                 i[99];
+	uint64_t                  max;
+	uint64_t *                mtable[NMOVES];
+	uint64_t *                ttable[NTRANS];
+	TransGroup *              tgrp;
+	struct coordinate *       base[2];
+	uint64_t *                symclass;
+	uint64_t *                symrep;
+	Trans *                   transtorep;
+	Trans *                   ttrep_move[NMOVES];
+	uint64_t *                selfsim;
+} Coordinate;
 
 void                    gen_coord(Coordinate *coord);
 uint64_t                index_coord(Coordinate *coord, Cube *cube,
@@ -18,19 +44,15 @@ uint64_t                trans_coord(Coordinate *coord, Trans t, uint64_t ind);
 extern Coordinate coord_eofb;
 extern Coordinate coord_coud;
 extern Coordinate coord_cp;
-extern Coordinate coord_cpudsep;
 extern Coordinate coord_epos;
 extern Coordinate coord_epe;
 extern Coordinate coord_eposepe;
 extern Coordinate coord_epud;
 extern Coordinate coord_eofbepos;
-extern Coordinate coord_coud_cpudsep;
 extern Coordinate coord_eofbepos_sym16;
-extern Coordinate coord_cp_sym16;
-extern Coordinate coord_corners_sym16;
 extern Coordinate coord_drud_sym16;
+extern Coordinate coord_cp_sym16;
 extern Coordinate coord_drudfin_noE_sym16;
-extern Coordinate coord_nxopt31;
 
 #else
 
@@ -61,15 +83,6 @@ i_cp = {
 	.n       = FACTORIAL8,
 	.index   = index_cp,
 	.to_cube = invindex_cp,
-};
-
-uint64_t index_cpudsep(Cube *cube);
-void     invindex_cpudsep(uint64_t ind, Cube *ret);
-Indexer
-i_cpudsep = {
-	.n       = BINOM8ON4,
-	.index   = index_cpudsep,
-	.to_cube = invindex_cpudsep,
 };
 
 uint64_t index_epos(Cube *cube);
@@ -132,13 +145,6 @@ coord_cp = {
 };
 
 Coordinate
-coord_cpudsep = {
-	.name = "cpudsep",
-	.type = COMP_COORD,
-	.i    = {&i_cpudsep, NULL},
-};
-
-Coordinate
 coord_epos = {
 	.name = "epos",
 	.type = COMP_COORD,
@@ -153,7 +159,7 @@ coord_epe = {
 };
 
 Coordinate
-coord_eposepe = { /* Has to be done by hand, hard compose epos + epe */
+coord_eposepe = {
 	.name = "eposepe",
 	.type = COMP_COORD,
 	.i    = {&i_eposepe, NULL},
@@ -171,13 +177,6 @@ coord_eofbepos = {
 	.name = "eofbepos",
 	.type = COMP_COORD,
 	.i    = {&i_epos, &i_eofb, NULL},
-};
-
-Coordinate
-coord_coud_cpudsep = {
-	.name = "coud_cpudsep",
-	.type = COMP_COORD,
-	.i    = {&i_coud, &i_cpudsep, NULL},
 };
 
 /* Symcoordinates ************************************************************/
@@ -201,13 +200,6 @@ coord_cp_sym16 = {
 /* "Symcomp" coordinates *****************************************************/
 
 Coordinate
-coord_corners_sym16 = {
-	.name = "corners_sym16",
-	.type = SYMCOMP_COORD,
-	.base = {&coord_cp_sym16, &coord_coud},
-};
-
-Coordinate
 coord_drud_sym16 = {
 	.name = "drud_sym16",
 	.type = SYMCOMP_COORD,
@@ -219,13 +211,6 @@ coord_drudfin_noE_sym16 = {
 	.name = "drudfin_noE_sym16",
 	.type = SYMCOMP_COORD,
 	.base = {&coord_cp_sym16, &coord_epud},
-};
-
-Coordinate
-coord_nxopt31 = {
-	.name = "nxopt31",
-	.type = SYMCOMP_COORD,
-	.base = {&coord_eofbepos_sym16, &coord_coud_cpudsep},
 };
 
 #endif
