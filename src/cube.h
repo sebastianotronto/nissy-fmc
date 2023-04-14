@@ -1,11 +1,6 @@
 #ifndef CUBE_H
 #define CUBE_H
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdint.h>
-
 #define false               0
 #define true                1
 #define POW2TO6             64ULL

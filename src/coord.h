@@ -1,10 +1,12 @@
 #ifndef COORD_H
 #define COORD_H
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <inttypes.h>
 
 #include "cube.h"
-#include "env.h"
 
 typedef enum { COMP_COORD, SYM_COORD, SYMCOMP_COORD } CoordType;
 typedef struct {

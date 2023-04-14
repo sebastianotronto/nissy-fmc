@@ -19,7 +19,6 @@ main(int argc, char *argv[])
 	m = 0;
 	t = NORMAL;
 
-	init_env();
 	init_cube();
 
 	for (i = 2; i < argc; i++) {

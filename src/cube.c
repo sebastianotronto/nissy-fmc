@@ -54,7 +54,8 @@ apply_permutation(int *perm, int *set, int n, int *aux)
 	for (i = 0; i < n; i++)
 		aux[i] = set[perm[i]];
 
-	memcpy(set, aux, n * sizeof(int));
+	for (i = 0; i < n; i++)
+		set[i] = aux[i];
 }
 
 static void
@@ -84,10 +85,17 @@ compose(Cube *c2, Cube *c1)
 void
 copy_cube(Cube *src, Cube *dst)
 {
-	memcpy(dst->ep, src->ep, 12 * sizeof(int));
-	memcpy(dst->eo, src->eo, 12 * sizeof(int));
-	memcpy(dst->cp, src->cp,  8 * sizeof(int));
-	memcpy(dst->co, src->co,  8 * sizeof(int));
+	int i;
+
+	for (i = 0; i < 12; i++) {
+		dst->ep[i] = src->ep[i];
+		dst->eo[i] = src->eo[i];
+	}
+
+	for (i = 0; i < 8; i++) {
+		dst->cp[i] = src->cp[i];
+		dst->co[i] = src->co[i];
+	}
 }
 
 void
@@ -128,12 +136,17 @@ is_solved(Cube *cube)
 void
 make_solved(Cube *cube)
 {
-	static int sorted[12] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+	int i;
 
-	memcpy(cube->ep, sorted, 12 * sizeof(int));
-	memset(cube->eo, 0,      12 * sizeof(int));
-	memcpy(cube->cp, sorted,  8 * sizeof(int));
-	memset(cube->co, 0,       8 * sizeof(int));
+	for (i = 0; i < 12; i++) {
+		cube->ep[i] = i;
+		cube->eo[i] = 0;
+	}
+
+	for (i = 0; i < 8; i++) {
+		cube->cp[i] = i;
+		cube->co[i] = 0;
+	}
 }
 
 Move
@@ -151,11 +164,6 @@ inverse_move(Move m)
 bool
 commute(Move m1, Move m2)
 {
-	if (m1 > B3 || m2 > B3) {
-		fprintf(stderr, "Unexpected commute for non-HTM\n");
-		return false;
-	}
-
 	if (m1 == NULLMOVE || m2 == NULLMOVE)
 		return m1 == m2;
 
@@ -260,11 +268,8 @@ apply_scramble(char *str, Cube *c)
 		if (str[i] == ' ' || str[i] == '\t' || str[i] == '\n')
 			continue;
 
-		if ((str[i] == '(' && niss) || (str[i] == ')' && !niss)) {
-			fprintf(stderr,
-			    "Error reading moves: unmatched %c\n", str[i]);
+		if ((str[i] == '(' && niss) || (str[i] == ')' && !niss))
 			return false;
-		}
 
 		if (str[i] == '(' || str[i] == ')') {
 			niss = !niss;
@@ -284,10 +289,8 @@ apply_scramble(char *str, Cube *c)
 		apply_move(move, niss ? &inverse : &normal);
 	}
 
-	if (niss) {
-		fprintf(stderr, "Error reading moves: unmatched (\n");
+	if (niss)
 		return false;
-	}
 
 	invert_cube(&inverse);
 	compose(c, &inverse);

@@ -277,15 +277,12 @@ ptableval(PruneData *pd, uint64_t ind)
 static bool
 read_ptable_file(PruneData *pd)
 {
-	init_env();
-
 	FILE *f;
-	char fname[strlen(tabledir)+256];
+	char fname[256];
 	int i;
 	uint64_t r;
 
-	strcpy(fname, tabledir);
-	strcat(fname, "/pt_");
+	strcpy(fname, "tables/pt_");
 	strcat(fname, pd->coord->name);
 
 	if ((f = fopen(fname, "rb")) == NULL)
@@ -304,15 +301,12 @@ read_ptable_file(PruneData *pd)
 static bool
 write_ptable_file(PruneData *pd)
 {
-	init_env();
-
 	FILE *f;
-	char fname[strlen(tabledir)+256];
+	char fname[256];
 	int i;
 	uint64_t w;
 
-	strcpy(fname, tabledir);
-	strcat(fname, "/pt_");
+	strcpy(fname, "tables/pt_");
 	strcat(fname, pd->coord->name);
 
 	if ((f = fopen(fname, "wb")) == NULL)

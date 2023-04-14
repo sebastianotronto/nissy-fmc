@@ -477,13 +477,12 @@ static bool
 read_coord_mtable(Coordinate *coord)
 {
 	FILE *f;
-	char fname[strlen(tabledir)+256];
+	char fname[256];
 	Move m;
 	uint64_t M;
 	bool r;
 
-	strcpy(fname, tabledir);
-	strcat(fname, "/mt_");
+	strcpy(fname, "tables/mt_");
 	strcat(fname, coord->name);
 
 	if ((f = fopen(fname, "rb")) == NULL)
@@ -507,12 +506,11 @@ static bool
 read_coord_sd(Coordinate *coord)
 {
 	FILE *f;
-	char fname[strlen(tabledir)+256];
+	char fname[256];
 	uint64_t M, N;
 	bool r;
 
-	strcpy(fname, tabledir);
-	strcat(fname, "/sd_");
+	strcpy(fname, "tables/sd_");
 	strcat(fname, coord->name);
 
 	if ((f = fopen(fname, "rb")) == NULL)
@@ -535,13 +533,12 @@ static bool
 read_coord_ttable(Coordinate *coord)
 {
 	FILE *f;
-	char fname[strlen(tabledir)+256];
+	char fname[256];
 	Trans t;
 	uint64_t M;
 	bool r;
 
-	strcpy(fname, tabledir);
-	strcat(fname, "/tt_");
+	strcpy(fname, "tables/tt_");
 	strcat(fname, coord->name);
 
 	if ((f = fopen(fname, "rb")) == NULL)
@@ -560,13 +557,12 @@ static bool
 write_coord_mtable(Coordinate *coord)
 {
 	FILE *f;
-	char fname[strlen(tabledir)+256];
+	char fname[256];
 	Move m;
 	uint64_t M;
 	bool r;
 
-	strcpy(fname, tabledir);
-	strcat(fname, "/mt_");
+	strcpy(fname, "tables/mt_");
 	strcat(fname, coord->name);
 
 	if ((f = fopen(fname, "wb")) == NULL)
@@ -590,12 +586,11 @@ static bool
 write_coord_sd(Coordinate *coord)
 {
 	FILE *f;
-	char fname[strlen(tabledir)+256];
+	char fname[256];
 	uint64_t M, N;
 	bool r;
 
-	strcpy(fname, tabledir);
-	strcat(fname, "/sd_");
+	strcat(fname, "tables/sd_");
 	strcat(fname, coord->name);
 
 	if ((f = fopen(fname, "wb")) == NULL)
@@ -618,13 +613,12 @@ static bool
 write_coord_ttable(Coordinate *coord)
 {
 	FILE *f;
-	char fname[strlen(tabledir)+256];
+	char fname[256];
 	Trans t;
 	uint64_t M;
 	bool r;
 
-	strcpy(fname, tabledir);
-	strcat(fname, "/tt_");
+	strcat(fname, "tables/tt_");
 	strcat(fname, coord->name);
 
 	if ((f = fopen(fname, "wb")) == NULL)
