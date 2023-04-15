@@ -1,9 +1,11 @@
 #define SOLVE_C
 
 #include "solve.h"
+#include "pruning.h"
 
 #define MAX_N_COORD 3
 
+typedef enum { NORMAL, INVERSE, NISS } SolutionType;
 typedef struct { uint64_t val; Trans t; } Movable;
 typedef struct {
 	char *                    shortname;
@@ -23,11 +25,9 @@ typedef struct {
 	Step *                    s;
 	Trans                     t;
 	SolutionType              st;
-	int *                     nsols;
-	Alg *                     sols;
+	char **                   sol;
 	int                       d;
 	int                       bound;
-	bool                      can_niss;
 	bool                      niss;
 	bool                      has_nissed;
 	Move                      last[2];
@@ -75,16 +75,20 @@ Step *steps[] = { &eofb_HTM, &drud_HTM, &drfin_drud, NULL };
 static void
 append_sol(DfsArg *arg)
 {
-	int i;
+	Alg alg;
+	int i, n;
 
-	copy_alg(arg->current_alg, &arg->sols[*arg->nsols]);
-	transform_alg(inverse_trans(arg->t), &arg->sols[*arg->nsols]);
+	copy_alg(arg->current_alg, &alg);
+	transform_alg(inverse_trans(arg->t), &alg);
 
 	if (arg->st == INVERSE)
-		for (i = 0; i < arg->sols[*arg->nsols].len; i++)
-			arg->sols[*arg->nsols].inv[i] = true;
+		for (i = 0; i < alg.len; i++)
+			alg.inv[i] = true;
 
-	(*arg->nsols)++;
+	n = alg_string(&alg, *arg->sol);
+	(*arg->sol)[n] = '\n';
+	(*arg->sol)[n+1] = 0;
+	*arg->sol += (n+1);
 }
 
 static bool
@@ -121,11 +125,9 @@ copy_dfsarg(DfsArg *src, DfsArg *dst)
 	dst->st          = src->st;
 	dst->d           = src->d;
 	dst->bound       = src->bound; /* In theory not needed */
-	dst->can_niss    = src->can_niss;
 	dst->niss        = src->niss;
 	dst->has_nissed  = src->has_nissed;
-	dst->nsols       = src->nsols;
-	dst->sols        = src->sols;
+	dst->sol         = src->sol;
 	dst->current_alg = src->current_alg;
 
 	for (i = 0; i < 2; i++) {
@@ -170,7 +172,7 @@ dfs(DfsArg *arg)
 	if (arg->bound == 0) {
 		len = arg->current_alg->len == arg->d;
 		singlecw = singlecwend(arg->current_alg);
-		niss = !arg->can_niss || arg->has_nissed;
+		niss = !(arg->st == NISS) || arg->has_nissed;
 		if (len && singlecw && niss)
 			append_sol(arg);
 		return;
@@ -249,7 +251,7 @@ dfs_move_checkstop(DfsArg *arg)
 
 	/* Computing bound for coordinates */
 	arg->bound = estimate_step(arg->s, arg->ind);
-	if (arg->can_niss && !arg->niss)
+	if (arg->st == NISS && !arg->niss)
 		arg->bound = MIN(1, arg->bound);
 
 	return arg->bound + arg->current_alg->len > arg->d ;
@@ -261,7 +263,7 @@ niss_makes_sense(DfsArg *arg)
 	Cube testcube;
 	DfsArg aux;
 
-	if (arg->niss || !arg->can_niss || arg->current_alg->len == 0)
+	if (arg->niss || !(arg->st == NISS) || arg->current_alg->len == 0)
 		return false;
 
 	make_solved(&testcube);
@@ -299,68 +301,113 @@ singlecwend(Alg *alg)
 
 /* Public functions **********************************************************/
 
-int
-solve(Cube *cube, char *stepstr, int m, SolutionType st, Trans t, Alg *sol)
+static bool
+set_step(char *str, Step **step)
 {
-	int i, n;
+	int i;
+
+	for (i = 0; steps[i] != NULL; i++) {
+		if (!strcmp(steps[i]->shortname, str)) {
+			*step = steps[i];
+			return true;
+		}
+	}
+	
+	return false;
+}
+
+static bool
+set_solutiontype(char *str, SolutionType *st)
+{
+	if (!strcmp(str, "normal")) {
+		*st = NORMAL;
+		return true;
+	}
+	if (!strcmp(str, "inverse")) {
+		*st = INVERSE;
+		return true;
+	}
+	if (!strcmp(str, "niss")) {
+		*st = NISS;
+		return true;
+	}
+
+	return false;
+}
+
+static bool
+set_trans(char *str, Trans *t)
+{
+	if (!strcmp(str, "uf")) {
+		*t = uf;
+		return true;
+	}
+	if (!strcmp(str, "fr")) {
+		*t = fr;
+		return true;
+	}
+	if (!strcmp(str, "rd")) {
+		*t = rd;
+		return true;
+	}
+
+	return false;
+}
+
+int
+solve(char *step, char *trans, int d, char *type, char *scramble, char *sol)
+{
+	int i;
 	Alg alg;
 	Cube c;
 	DfsArg arg;
-	Step *step;
 
-	/* Prepare step TODO: remove all initialization! */
-	step = NULL;
-	for (i = 0; steps[i] != NULL; i++)
-		if (!strcmp(steps[i]->shortname, stepstr))
-			step = steps[i];
-	if (step == NULL) {
-		fprintf(stderr, "No step to solve!\n");
-		return 0;
-	}
-	PDGenData pdg;
-	pdg.moveset = step->moveset;
-	for (i = 0; step->coord[i] != NULL; i++) {
-		gen_coord(step->coord[i]);
-		pdg.coord   = step->coord[i];
-		pdg.compact = step->compact_pd[i];
-		pdg.pd      = NULL;
-		step->pd[i] = genptable(&pdg);
-		if (step->compact_pd[i]) {
-			gen_coord(step->fallback_coord[i]);
-			pdg.coord   = step->fallback_coord[i];
-			pdg.compact = false;
-			pdg.pd      = NULL;
-			step->fallback_pd[i] = genptable(&pdg);
-		}
-	}
-
-	alg.len = 0;
-	n = 0;
-
-	/* Prepare cube for solve */
-	arg.cube = &c;
-	copy_cube(cube, arg.cube);
-	if (st == INVERSE)
-		invert_cube(arg.cube);
-	apply_trans(t, arg.cube);
-	arg.s           = step;
-	compute_ind(&arg);
-	arg.t           = t;
-	arg.st          = st;
-	arg.can_niss    = st == NISS;
-	arg.nsols       = &n;
-	arg.sols        = sol;
-	arg.d           = m;
 	arg.niss        = false;
 	arg.has_nissed  = false;
 	arg.last[0]     = NULLMOVE;
 	arg.last[1]     = NULLMOVE;
 	arg.lastinv[0]  = NULLMOVE;
 	arg.lastinv[1]  = NULLMOVE;
+
+	alg.len = 0;
 	arg.current_alg = &alg;
 
-	dfs(&arg);
+	arg.d = d;
+	arg.sol = &sol;
 
-	return n;
+	if (!set_step(step, &arg.s)) return 1;
+
+	/* Prepare step TODO: remove all initialization! */
+	PDGenData pdg;
+	pdg.moveset = arg.s->moveset;
+	for (i = 0; arg.s->coord[i] != NULL; i++) {
+		gen_coord(arg.s->coord[i]);
+		pdg.coord   = arg.s->coord[i];
+		pdg.compact = arg.s->compact_pd[i];
+		pdg.pd      = NULL;
+		arg.s->pd[i] = genptable(&pdg);
+		if (arg.s->compact_pd[i]) {
+			gen_coord(arg.s->fallback_coord[i]);
+			pdg.coord   = arg.s->fallback_coord[i];
+			pdg.compact = false;
+			pdg.pd      = NULL;
+			arg.s->fallback_pd[i] = genptable(&pdg);
+		}
+	}
+
+	if (!set_trans(trans, &arg.t)) return 2;
+
+	if (!set_solutiontype(type, &arg.st)) return 4;
+
+	make_solved(&c);
+	if (!apply_scramble(scramble, &c)) return 5;
+	if (arg.st == INVERSE)
+		invert_cube(&c);
+	apply_trans(arg.t, &c);
+	arg.cube = &c;
+	compute_ind(&arg);
+
+	dfs(&arg);
+	return 0;
 }
 

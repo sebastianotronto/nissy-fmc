@@ -590,7 +590,7 @@ write_coord_sd(Coordinate *coord)
 	uint64_t M, N;
 	bool r;
 
-	strcat(fname, "tables/sd_");
+	strcpy(fname, "tables/sd_");
 	strcat(fname, coord->name);
 
 	if ((f = fopen(fname, "wb")) == NULL)
@@ -618,7 +618,7 @@ write_coord_ttable(Coordinate *coord)
 	uint64_t M;
 	bool r;
 
-	strcat(fname, "tables/tt_");
+	strcpy(fname, "tables/tt_");
 	strcat(fname, coord->name);
 
 	if ((f = fopen(fname, "wb")) == NULL)

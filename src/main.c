@@ -1,3 +1,7 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "cube.h"
 #include "solve.h"
 
 #define MAX_SOLS 999
@@ -5,55 +9,36 @@
 int
 main(int argc, char *argv[])
 {
-	int i, m, n;
-	long val;
-	Cube c;
-	SolutionType t;
-	Alg sols[999];
+	char sols[99999];
 
-	if (argc < 2) {
+	init_cube();
+
+	if (argc != 6) {
 		fprintf(stderr, "Not enough arguments given\n");
 		return -1;
 	}
 
-	m = 0;
-	t = NORMAL;
+	char *step = argv[1];
+	char *trans = argv[2];
+	int d = strtol(argv[3], NULL, 10);
+	char *type = argv[4];
+	char *scramble = argv[5];
 
-	init_cube();
-
-	for (i = 2; i < argc; i++) {
-		if (!strcmp(argv[i], "-m") && i+1 < argc) {
-			val = strtol(argv[++i], NULL, 10);
-			if (val < 0 || val > 100) {
-				fprintf(stderr, "Invalid number of moves\n");
-				return 2;
-			}
-			m = val;
-		} else if (!strcmp(argv[i], "-I")) {
-			t = INVERSE;
-		} else if (!strcmp(argv[i], "-N")) {
-			t = NISS;
-		} else {
-			break;
-		}
-	}
-
-	if (i == argc) {
-		fprintf(stderr, "No scramble given\n");
-		return 4;
-	}
-
-	make_solved(&c);
-	if (!apply_scramble(argv[i], &c)) {
-		fprintf(stderr, "Invalid scramble: %s\n", argv[i]);
-		return 5;
-	}
-
-	n = solve(&c, argv[1], m, t, uf, sols); /* TODO: trans */
-	for (i = 0; i < n; i++) {
-		char buf[66];
-		int l = alg_string(&sols[i], buf);
-		printf("%s (%d)\n", buf, l);
+	switch (solve(step, trans, d, type, scramble, sols)) {
+	case 1:
+		fprintf(stderr, "Error parsing step: %s\n", step);
+		return -1;
+	case 2:
+		fprintf(stderr, "Error parsing trans: %s\n", trans);
+		return -1;
+	case 4:
+		fprintf(stderr, "Error parsing type: %s\n", type);
+		return -1;
+	case 5:
+		fprintf(stderr, "Error applying scramble: %s\n", scramble);
+		return -1;
+	default:
+		printf(sols);
 	}
 
 	return 0;
