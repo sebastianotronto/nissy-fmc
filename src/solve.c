@@ -1,24 +1,11 @@
 #define SOLVE_C
 
+#include "coord.h"
+#include "steps.h"
 #include "solve.h"
-#include "pruning.h"
-
-#define MAX_N_COORD 3
 
 typedef enum { NORMAL, INVERSE, NISS } SolutionType;
 typedef struct { uint64_t val; Trans t; } Movable;
-typedef struct {
-	char *                    shortname;
-	bool                      filter;
-	Moveset *                 moveset;
-	Coordinate *              coord[MAX_N_COORD];
-	PruneData *               pd[MAX_N_COORD];
-	bool                      compact_pd[MAX_N_COORD];
-	Coordinate *              fallback_coord[MAX_N_COORD];
-	PruneData *               fallback_pd[MAX_N_COORD];
-	uint64_t                  fbmod[MAX_N_COORD];
-
-} Step;
 typedef struct {
 	Cube *                    cube;
 	Movable                   ind[MAX_N_COORD];
@@ -44,33 +31,6 @@ static void        dfs(DfsArg *arg);
 static void        dfs_niss(DfsArg *arg);
 static bool        dfs_move_checkstop(DfsArg *arg);
 static bool        niss_makes_sense(DfsArg *arg);
-static bool        singlecwend(Alg *alg);
-
-Step eofb_HTM = {
-	.shortname      = "eofb",
-	.filter         = true,
-	.moveset        = allowed_HTM,
-	.coord          = {&coord_eofb, NULL},
-	.compact_pd     = {false},
-};
-
-Step drud_HTM = {
-	.shortname      = "drud",
-	.filter         = true,
-	.moveset        = allowed_HTM,
-	.coord          = {&coord_drud_sym16, NULL},
-	.compact_pd     = {false}, /* TODO: compactify! */
-};
-
-Step drfin_drud = {
-	.shortname      = "drudfin",
-	.filter         = false,
-	.moveset        = allowed_drud,
-	.coord          = {&coord_drudfin_noE_sym16, &coord_epe, NULL},
-	.compact_pd     = {false}, /* TODO: compactify! */
-};
-
-Step *steps[] = { &eofb_HTM, &drud_HTM, &drfin_drud, NULL };
 
 static void
 append_sol(DfsArg *arg)
@@ -144,17 +104,11 @@ copy_dfsarg(DfsArg *src, DfsArg *dst)
 static int
 estimate_step(Step *step, Movable *ind)
 {
-	int i, v, ret = -1;
+	int i, ret;
 
-	for (i = 0; step->coord[i] != NULL; i++) {
-		v = ptableval(step->pd[i], ind[i].val);
-		if (v == step->pd[i]->base && step->compact_pd[i])
-			v = ptableval(step->fallback_pd[i],
-			    ind[i].val / step->fbmod[i]);
-		if (v == 0 && ind[i].val != 0)
-			v = 1;
-		ret = MAX(ret, v);
-	}
+	ret = -1;
+	for (i = 0; step->coord[i] != NULL; i++)
+		ret = MAX(ret, ptableval(step->coord[i], ind[i].val));
 
 	return ret;
 }
@@ -164,16 +118,15 @@ dfs(DfsArg *arg)
 {
 	Move m;
 	DfsArg newarg;
-	bool len, singlecw, niss;
+	bool len, niss;
 
 	if (dfs_move_checkstop(arg))
 		return;
 
 	if (arg->bound == 0) {
 		len = arg->current_alg->len == arg->d;
-		singlecw = singlecwend(arg->current_alg);
 		niss = !(arg->st == NISS) || arg->has_nissed;
-		if (len && singlecw && niss)
+		if (len && niss)
 			append_sol(arg);
 		return;
 	}
@@ -276,29 +229,6 @@ niss_makes_sense(DfsArg *arg)
 	return estimate_step(aux.s, aux.ind) > 0;
 }
 
-bool
-singlecwend(Alg *alg)
-{
-	int i;
-	bool nor, inv;
-	Move l2 = NULLMOVE, l1 = NULLMOVE, l2i = NULLMOVE, l1i = NULLMOVE;
-
-	for (i = 0; i < alg->len; i++) {
-		if (alg->inv[i]) {
-			l2i = l1i;
-			l1i = alg->move[i];
-		} else {
-			l2 = l1;
-			l1 = alg->move[i];
-		}
-	}
-
-	nor = l1 ==base_move(l1)  && (!commute(l1, l2) ||l2 ==base_move(l2));
-	inv = l1i==base_move(l1i) && (!commute(l1i,l2i)||l2i==base_move(l2i));
-
-	return nor && inv;
-}
-
 /* Public functions **********************************************************/
 
 static bool
@@ -378,22 +308,8 @@ solve(char *step, char *trans, int d, char *type, char *scramble, char *sol)
 	if (!set_step(step, &arg.s)) return 1;
 
 	/* Prepare step TODO: remove all initialization! */
-	PDGenData pdg;
-	pdg.moveset = arg.s->moveset;
-	for (i = 0; arg.s->coord[i] != NULL; i++) {
+	for (i = 0; arg.s->coord[i] != NULL; i++)
 		gen_coord(arg.s->coord[i]);
-		pdg.coord   = arg.s->coord[i];
-		pdg.compact = arg.s->compact_pd[i];
-		pdg.pd      = NULL;
-		arg.s->pd[i] = genptable(&pdg);
-		if (arg.s->compact_pd[i]) {
-			gen_coord(arg.s->fallback_coord[i]);
-			pdg.coord   = arg.s->fallback_coord[i];
-			pdg.compact = false;
-			pdg.pd      = NULL;
-			arg.s->fallback_pd[i] = genptable(&pdg);
-		}
-	}
 
 	if (!set_trans(trans, &arg.t)) return 2;
 

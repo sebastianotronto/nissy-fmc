@@ -2,6 +2,9 @@
 
 #include "coord.h"
 
+#define ENTRIES_PER_GROUP              (2*sizeof(entry_group_t))
+#define ENTRIES_PER_GROUP_COMPACT      (4*sizeof(entry_group_t))
+
 static uint64_t    indexers_getind(Indexer **is, Cube *c);
 static uint64_t    indexers_getmax(Indexer **is);
 static void        indexers_makecube(Indexer **is, uint64_t ind, Cube *c);
@@ -14,293 +17,15 @@ static bool        write_coord_mtable(Coordinate *coord);
 static bool        write_coord_sd(Coordinate *coord);
 static bool        write_coord_ttable(Coordinate *coord);
 
-/* Utility functions *********************************************************/
-
-int
-factorial(int n)
-{
-	int i, ret = 1;
-
-	if (n < 0)
-		return 0;
-
-	for (i = 1; i <= n; i++)
-		ret *= i;
-
-	return ret;
-}
-
-int
-perm_to_index(int *a, int n)
-{
-	int i, j, c, ret = 0;
-
-	for (i = 0; i < n; i++) {
-		c = 0;
-		for (j = i+1; j < n; j++)
-			c += (a[i] > a[j]) ? 1 : 0;
-		ret += factorial(n-i-1) * c;
-	}
-
-	return ret;
-}
-
-void
-index_to_perm(int p, int n, int *r)
-{
-	int *a = malloc(n * sizeof(int));
-	int i, j, c;
-
-	for (i = 0; i < n; i++)
-		a[i] = 0;
-
-	if (p < 0 || p >= factorial(n))
-		for (i = 0; i < n; i++)
-			r[i] = -1;
-
-	for (i = 0; i < n; i++) {
-		c = 0;
-		j = 0;
-		while (c <= p / factorial(n-i-1))
-			c += a[j++] ? 0 : 1;
-		r[i] = j-1;
-		a[j-1] = 1;
-		p %= factorial(n-i-1);
-	}
-
-	free(a);
-}
-
-int
-binomial(int n, int k)
-{
-	if (n < 0 || k < 0 || k > n)
-		return 0;
-
-	return factorial(n) / (factorial(k) * factorial(n-k));
-}
-
-int 
-subset_to_index(int *a, int n, int k)
-{
-	int i, ret = 0;
-
-	for (i = 0; i < n; i++) {
-		if (k == n-i)
-			return ret;
-		if (a[i]) {
-			ret += binomial(n-i-1, k);
-			k--;
-		}
-	}
-
-	return ret;
-}
-
-void
-index_to_subset(int s, int n, int k, int *r)
-{
-	int i, j, v;
-
-	for (i = 0; i < n; i++) {
-		if (k == n-i) {
-			for (j = i; j < n; j++)
-				r[j] = 1;
-			return;
-		}
-
-		if (k == 0) {
-			for (j = i; j < n; j++)
-				r[j] = 0;
-			return;
-		}
-
-		v = binomial(n-i-1, k);
-		if (s >= v) {
-			r[i] = 1;
-			k--;
-			s -= v;
-		} else {
-			r[i] = 0;
-		}
-	}
-}
-
-int
-digit_array_to_int(int *a, int n, int b)
-{
-	int i, ret = 0, p = 1;
-
-	for (i = 0; i < n; i++, p *= b)
-		ret += a[i] * p;
-
-	return ret;
-}
-
-void
-int_to_digit_array(int a, int b, int n, int *r)
-{
-	int i;
-
-	for (i = 0; i < n; i++, a /= b)
-		r[i] = a % b;
-}
-
-void
-int_to_sum_zero_array(int x, int b, int n, int *a)
-{
-	int i, s = 0;
-
-	int_to_digit_array(x, b, n-1, a);
-	for (i = 0; i < n - 1; i++)
-	    s = (s + a[i]) % b;
-	a[n-1] = (b - s) % b;
-}
-
-int
-perm_sign(int *a, int n)
-{
-	int i, j, ret = 0;
-
-	for (i = 0; i < n; i++)
-		for (j = i+1; j < n; j++)
-			ret += (a[i] > a[j]) ? 1 : 0;
-
-	return ret % 2;
-}
-
-/* Indexers ******************************************************************/
-
-uint64_t
-index_eofb(Cube *cube)
-{
-	return (uint64_t)digit_array_to_int(cube->eo, 11, 2);
-}
-
-uint64_t
-index_coud(Cube *cube)
-{
-	return (uint64_t)digit_array_to_int(cube->co, 7, 3);
-}
-
-uint64_t
-index_cp(Cube *cube)
-{
-	return (uint64_t)perm_to_index(cube->cp, 8);
-}
-
-uint64_t
-index_epe(Cube *cube)
-{
-	int i, e[4];
-
-	for (i = 0; i < 4; i++)
-		e[i] = cube->ep[i+8] - 8;
-
-	return (uint64_t)perm_to_index(e, 4);
-}
-
-uint64_t
-index_epud(Cube *cube)
-{
-	return (uint64_t)perm_to_index(cube->ep, 8);
-}
-
-uint64_t
-index_epos(Cube *cube)
-{
-	int i, a[12];
-
-	for (i = 0; i < 12; i++)
-		a[i] = (cube->ep[i] < 8) ? 0 : 1;
-
-	return (uint64_t)subset_to_index(a, 12, 4);
-}
-
-uint64_t
-index_eposepe(Cube *cube)
-{
-	int i, j, e[4];
-	uint64_t epos, epe;
-
-	epos = (uint64_t)index_epos(cube);
-	for (i = 0, j = 0; i < 12; i++)
-		if (cube->ep[i] >= 8)
-			e[j++] = cube->ep[i] - 8;
-	epe = (uint64_t)perm_to_index(e, 4);
-
-	return epos * FACTORIAL4 + epe;
-}
-
-/* Inverse indexers **********************************************************/
-
-void
-invindex_eofb(uint64_t ind, Cube *cube)
-{
-	int_to_sum_zero_array(ind, 2, 12, cube->eo);
-}
-
-void
-invindex_coud(uint64_t ind, Cube *cube)
-{
-	int_to_sum_zero_array(ind, 3, 8, cube->co);
-}
-
-void
-invindex_cp(uint64_t ind, Cube *cube)
-{
-	index_to_perm(ind, 8, cube->cp);
-}
-
-void
-invindex_epe(uint64_t ind, Cube *cube)
-{
-	int i;
-
-	index_to_perm(ind, 4, &cube->ep[8]);
-	for (i = 0; i < 4; i++)
-		cube->ep[i+8] += 8;
-}
-
-void
-invindex_epud(uint64_t ind, Cube *cube)
-{
-	index_to_perm(ind, 8, cube->ep);
-}
-
-void
-invindex_epos(uint64_t ind, Cube *cube)
-{
-	int i, j, k;
-
-	index_to_subset(ind, 12, 4, cube->ep);
-	for (i = 0, j = 0, k = 8; i < 12; i++)
-		if (cube->ep[i] == 0)
-			cube->ep[i] = j++;
-		else
-			cube->ep[i] = k++;
-}
-
-void
-invindex_eposepe(uint64_t ind, Cube *cube)
-{
-	int i, j, k, e[4];
-	uint64_t epos, epe;
-
-	epos = ind / FACTORIAL4;
-	epe = ind % FACTORIAL4;
-
-	index_to_subset(epos, 12, 4, cube->ep);
-	index_to_perm(epe, 4, e);
-
-	for (i = 0, j = 0, k = 0; i < 12; i++)
-		if (cube->ep[i] == 0)
-			cube->ep[i] = j++;
-		else
-			cube->ep[i] = e[k++] + 8;
-}
-
-/* Other local functions *****************************************************/
+static void        genptable(Coordinate *coord);
+static void        genptable_bfs(Coordinate *coord, int d);
+static void        fixnasty(Coordinate *coord, uint64_t i, int d);
+static void        genptable_compress(Coordinate *coord);
+static void        genptable_setbase(Coordinate *coord);
+static uint64_t    ptablesize(Coordinate *coord);
+static void        ptable_update(Coordinate *coord, uint64_t ind, int m);
+static bool        read_ptable_file(Coordinate *coord);
+static bool        write_ptable_file(Coordinate *coord);
 
 static uint64_t
 indexers_getmax(Indexer **is)
@@ -667,6 +392,8 @@ gen_coord(Coordinate *coord)
 	}
 
 	coord->generated = true;
+	genptable(coord);
+
 	return;
 
 error_gc:
@@ -808,3 +535,253 @@ trans_coord(Coordinate *coord, Trans t, uint64_t ind)
 
 	return coord->max; /* Only reached in case of error */
 }
+
+static void
+genptable(Coordinate *coord)
+{
+	bool compact;
+	int d, i;
+	uint64_t oldn, sz;
+
+	compact = coord->base[1] != NULL;
+	sz = ptablesize(coord) * (compact ? 2 : 1);
+	coord->ptable = malloc(sz * sizeof(entry_group_t));
+
+	if (read_ptable_file(coord))
+		return;
+
+	/* For the first steps we proceed the same way for compact and not */
+	coord->compact = false;
+
+	fprintf(stderr, "Generating pt_%s\n", coord->name); 
+
+	/* TODO: replace with loop */
+	memset(coord->ptable, ~(uint8_t)0,
+	    ptablesize(coord)*sizeof(entry_group_t));
+	for (i = 0; i < 16; i++)
+		coord->count[i] = 0;
+
+	coord->updated = 0;
+	oldn = 0;
+	ptable_update(coord, 0, 0);
+	fixnasty(coord, 0, 0);
+	fprintf(stderr, "Depth %d done, generated %"
+		PRIu64 "\t(%" PRIu64 "/%" PRIu64 ")\n",
+		0, coord->updated - oldn, coord->updated, coord->max);
+	oldn = coord->updated;
+	coord->count[0] = coord->updated;
+	for (d = 0; d < 15 && coord->updated < coord->max; d++) {
+		genptable_bfs(coord, d);
+		fprintf(stderr, "Depth %d done, generated %"
+			PRIu64 "\t(%" PRIu64 "/%" PRIu64 ")\n",
+			d+1, coord->updated-oldn, coord->updated, coord->max);
+		coord->count[d+1] = coord->updated - oldn;
+		oldn = coord->updated;
+	}
+	fprintf(stderr, "Pruning table generated!\n");
+	
+	genptable_setbase(coord);
+	if (compact)
+		genptable_compress(coord);
+
+	if (!write_ptable_file(coord))
+		fprintf(stderr, "Error writing ptable file\n");
+}
+
+static void
+genptable_bfs(Coordinate *coord, int d)
+{
+	uint64_t i, ii;
+	int pval;
+	Move m;
+
+	for (i = 0; i < coord->max; i++) {
+		pval = ptableval(coord, i);
+		if (pval != d)
+			continue;
+		for (m = U; m <= B3; m++) {
+			if (!coord->moveset(m))
+				continue;
+			ii = move_coord(coord, m, i, NULL);
+			ptable_update(coord, ii, d+1);
+			fixnasty(coord, ii, d+1);
+		}
+	}
+}
+
+static void
+fixnasty(Coordinate *coord, uint64_t i, int d)
+{
+	uint64_t ii, ss, M;
+	int j;
+	Trans t;
+
+	if (coord->type != SYMCOMP_COORD)
+		return;
+
+	M = coord->base[1]->max;
+	ss = coord->base[0]->selfsim[i/M];
+	for (j = 0; j < coord->base[0]->tgrp->n; j++) {
+		t = coord->base[0]->tgrp->t[j];
+		if (t == uf || !(ss & ((uint64_t)1<<t)))
+			continue;
+		ii = trans_coord(coord, t, i);
+		ptable_update(coord, ii, d);
+	}
+}
+
+static void
+genptable_compress(Coordinate *coord)
+{
+	int val;
+	uint64_t i, j;
+	entry_group_t mask, v;
+
+	fprintf(stderr, "Compressing table to 2 bits per entry\n");
+
+	for (i = 0; i < coord->max; i += ENTRIES_PER_GROUP_COMPACT) {
+		mask = (entry_group_t)0;
+		for (j = 0; j < ENTRIES_PER_GROUP_COMPACT; j++) {
+			if (i+j >= coord->max)
+				break;
+			val = ptableval(coord, i+j) - coord->ptablebase;
+			v = (entry_group_t)MIN(3, MAX(0, val));
+			mask |= v << (2*j);
+		}
+		coord->ptable[i/ENTRIES_PER_GROUP_COMPACT] = mask;
+	}
+
+	coord->compact = true;
+	coord->ptable = realloc(coord->ptable,
+	    sizeof(entry_group_t)*ptablesize(coord));
+}
+
+static void
+genptable_setbase(Coordinate *coord)
+{
+	int i;
+	uint64_t sum, newsum;
+
+	coord->ptablebase = 0;
+	sum = coord->count[0] + coord->count[1] + coord->count[2];
+	for (i = 3; i < 16; i++) {
+		newsum = sum + coord->count[i] - coord->count[i-3];
+		if (newsum > sum)
+			coord->ptablebase = i-3;
+		sum = newsum;
+	}
+}
+
+void
+print_ptable(Coordinate *coord)
+{
+	uint64_t i;
+
+	printf("Table %s\n", coord->name);
+	printf("Base value: %d\n", coord->ptablebase);
+	for (i = 0; i < 16; i++)
+		printf("%2" PRIu64 "\t%10" PRIu64 "\n", i, coord->count[i]);
+}
+
+static uint64_t
+ptablesize(Coordinate *coord)
+{
+	uint64_t e;
+
+	e = coord->compact ? ENTRIES_PER_GROUP_COMPACT : ENTRIES_PER_GROUP;
+
+	return (coord->max + e - 1) / e;
+}
+
+static void
+ptable_update(Coordinate *coord, uint64_t ind, int n)
+{
+	int sh;
+	entry_group_t mask;
+	uint64_t i;
+
+	if (ptableval(coord, ind) <= n)
+		return;
+
+	sh = 4 * (ind % ENTRIES_PER_GROUP);
+	mask = ((entry_group_t)15) << sh;
+	i = ind/ENTRIES_PER_GROUP;
+	coord->ptable[i] &= ~mask;
+	coord->ptable[i] |= (((entry_group_t)n)&15) << sh;
+
+	coord->updated++;
+}
+
+int
+ptableval(Coordinate *coord, uint64_t ind)
+{
+	int ret, j, sh;
+	uint64_t e, ii;
+
+	if (coord->compact) {
+		e  = ENTRIES_PER_GROUP_COMPACT;
+		sh = (ind % e) * 2;
+		ret = (coord->ptable[ind/e] & (3 << sh)) >> sh;
+		if (ret != coord->ptablebase)
+			return ret;
+		for (j = 0; coord->base[j] != NULL; j++) ;
+		for ( ; j >= 0; j--) {
+			ii = ind % coord->base[j]->max;
+			ret = MAX(ret, ptableval(coord->base[j], ii));
+			ind /= coord->base[j]->max;
+		}
+		return ret;
+	}
+
+	e  = ENTRIES_PER_GROUP;
+	sh = (ind % e) * 4;
+	return (coord->ptable[ind/e] & (15 << sh)) >> sh;
+}
+
+static bool
+read_ptable_file(Coordinate *coord)
+{
+	FILE *f;
+	char fname[256];
+	int i;
+	uint64_t r;
+
+	strcpy(fname, "tables/pt_");
+	strcat(fname, coord->name);
+
+	if ((f = fopen(fname, "rb")) == NULL)
+		return false;
+
+	r = fread(&(coord->ptablebase), sizeof(int), 1, f);
+	for (i = 0; i < 16; i++)
+		r += fread(&(coord->count[i]), sizeof(uint64_t), 1, f);
+	r += fread(coord->ptable, sizeof(entry_group_t), ptablesize(coord), f);
+
+	fclose(f);
+
+	return r == 17 + ptablesize(coord);
+}
+
+static bool
+write_ptable_file(Coordinate *coord)
+{
+	FILE *f;
+	char fname[256];
+	int i;
+	uint64_t w;
+
+	strcpy(fname, "tables/pt_");
+	strcat(fname, coord->name);
+
+	if ((f = fopen(fname, "wb")) == NULL)
+		return false;
+
+	w = fwrite(&(coord->ptablebase), sizeof(int), 1, f);
+	for (i = 0; i < 16; i++)
+		w += fwrite(&(coord->count[i]), sizeof(uint64_t), 1, f);
+	w += fwrite(coord->ptable, sizeof(entry_group_t), ptablesize(coord), f);
+	fclose(f);
+
+	return w == 17 + ptablesize(coord);
+}
+
