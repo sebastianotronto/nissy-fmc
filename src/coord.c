@@ -1,5 +1,9 @@
-#define COORD_C
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <inttypes.h>
 
+#include "cube.h"
 #include "coord.h"
 
 #define ENTRIES_PER_GROUP              (2*sizeof(entry_group_t))
@@ -784,4 +788,3 @@ write_ptable_file(Coordinate *coord)
 
 	return w == 17 + ptablesize(coord);
 }
-

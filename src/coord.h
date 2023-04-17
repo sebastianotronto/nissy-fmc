@@ -1,13 +1,3 @@
-#ifndef COORD_H
-#define COORD_H
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <inttypes.h>
-
-#include "cube.h"
-
 #define entry_group_t uint8_t
 
 typedef bool (Moveset)(Move);
@@ -52,5 +42,3 @@ uint64_t                trans_coord(Coordinate *coord, Trans t, uint64_t ind);
 
 void                    print_ptable(Coordinate *coord);
 int                     ptableval(Coordinate *coord, uint64_t ind);
-
-#endif

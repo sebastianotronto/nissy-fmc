@@ -1,6 +1,3 @@
-#ifndef CUBE_H
-#define CUBE_H
-
 #define false               0
 #define true                1
 #define POW2TO6             64ULL
@@ -80,5 +77,3 @@ Move transform_move(Trans t, Move m);
 Trans transform_trans(Trans t, Trans m);
 
 void init_cube();
-
-#endif
