@@ -3,7 +3,6 @@
 
 #include "cube.h"
 #include "coord.h"
-#include "solve.h"
 
 #define MAX_N_COORD 3
 
@@ -775,7 +774,6 @@ set_trans(char *str, Trans *t)
 int
 solve(char *step, char *trans, int d, char *type, char *scramble, char *sol)
 {
-	int i;
 	Alg alg;
 	Cube c;
 	DfsArg arg;
@@ -794,17 +792,13 @@ solve(char *step, char *trans, int d, char *type, char *scramble, char *sol)
 	arg.sol = &sol;
 
 	if (!set_step(step, &arg.s)) return 1;
-
-	/* Prepare step TODO: remove all initialization! */
-	for (i = 0; arg.s->coord[i] != NULL; i++)
-		gen_coord(arg.s->coord[i]);
-
 	if (!set_trans(trans, &arg.t)) return 2;
-
 	if (!set_solutiontype(type, &arg.st)) return 4;
 
 	make_solved(&c);
+
 	if (!apply_scramble(scramble, &c)) return 5;
+
 	if (arg.st == INVERSE)
 		invert_cube(&c);
 	apply_trans(arg.t, &c);
@@ -813,4 +807,15 @@ solve(char *step, char *trans, int d, char *type, char *scramble, char *sol)
 
 	dfs(&arg);
 	return 0;
+}
+
+void
+init_nissy()
+{
+	int i;
+
+	init_cube();
+
+	for (i = 0; coordinates[i] != NULL; i++)
+		gen_coord(coordinates[i]);
 }

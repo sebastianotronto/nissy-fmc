@@ -1,8 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "cube.h"
-#include "solve.h"
+#include "nissy.h"
 
 #define MAX_SOLS 999
 
@@ -11,7 +10,7 @@ main(int argc, char *argv[])
 {
 	char sols[99999];
 
-	init_cube();
+	init_nissy();
 
 	if (argc != 6) {
 		fprintf(stderr, "Not enough arguments given\n");
