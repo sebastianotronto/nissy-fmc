@@ -6,31 +6,31 @@
 #include "cube.h"
 #include "coord.h"
 
-#define ENTRIES_PER_GROUP              (2*sizeof(entry_group_t))
-#define ENTRIES_PER_GROUP_COMPACT      (4*sizeof(entry_group_t))
+#define ENTRIES_PER_GROUP         (2*sizeof(entry_group_t))
+#define ENTRIES_PER_GROUP_COMPACT (4*sizeof(entry_group_t))
 
-static uint64_t    indexers_getind(Indexer **is, Cube *c);
-static uint64_t    indexers_getmax(Indexer **is);
-static void        indexers_makecube(Indexer **is, uint64_t ind, Cube *c);
-static int         coord_base_number(Coordinate *coord);
-static void        gen_coord_comp(Coordinate *coord);
-static void        gen_coord_sym(Coordinate *coord);
-static bool        read_coord_mtable(Coordinate *coord);
-static bool        read_coord_sd(Coordinate *coord);
-static bool        read_coord_ttable(Coordinate *coord);
-static bool        write_coord_mtable(Coordinate *coord);
-static bool        write_coord_sd(Coordinate *coord);
-static bool        write_coord_ttable(Coordinate *coord);
+static uint64_t indexers_getind(Indexer **, Cube *);
+static uint64_t indexers_getmax(Indexer **);
+static void indexers_makecube(Indexer **, uint64_t, Cube *);
+static int coord_base_number(Coordinate *);
+static void gen_coord_comp(Coordinate *);
+static void gen_coord_sym(Coordinate *);
+static bool read_coord_mtable(Coordinate *);
+static bool read_coord_sd(Coordinate *);
+static bool read_coord_ttable(Coordinate *);
+static bool write_coord_mtable(Coordinate *);
+static bool write_coord_sd(Coordinate *);
+static bool write_coord_ttable(Coordinate *);
 
-static void        genptable(Coordinate *coord);
-static void        genptable_bfs(Coordinate *coord, int d);
-static void        fixnasty(Coordinate *coord, uint64_t i, int d);
-static void        genptable_compress(Coordinate *coord);
-static void        genptable_setbase(Coordinate *coord);
-static uint64_t    ptablesize(Coordinate *coord);
-static void        ptable_update(Coordinate *coord, uint64_t ind, int m);
-static bool        read_ptable_file(Coordinate *coord);
-static bool        write_ptable_file(Coordinate *coord);
+static void genptable(Coordinate *);
+static void genptable_bfs(Coordinate *, int);
+static void fixnasty(Coordinate *, uint64_t, int);
+static void genptable_compress(Coordinate *);
+static void genptable_setbase(Coordinate *);
+static uint64_t ptablesize(Coordinate *);
+static void ptable_update(Coordinate *, uint64_t, int);
+static bool read_ptable_file(Coordinate *);
+static bool write_ptable_file(Coordinate *);
 
 static uint64_t
 indexers_getmax(Indexer **is)
@@ -498,32 +498,6 @@ move_coord(Coordinate *coord, Move m, uint64_t ind, Trans *offtrans)
 	return coord->max; /* Only reached in case of error */
 }
 
-bool
-test_coord(Coordinate *coord)
-{
-	uint64_t ui, uj;
-	Cube c;
-
-	if (coord->type != COMP_COORD) {
-		fprintf(stderr, "Can only test COMP_COORD\n");
-		return false;
-	}
-
-	gen_coord(coord);
-	for (ui = 0; ui < coord->max; ui++) {
-		indexers_makecube(coord->i, ui, &c);
-		uj = indexers_getind(coord->i, &c);
-		if (ui != uj) {
-			fprintf(stderr, "%s: error: %" PRIu64 " different"
-			    " from %" PRIu64 "\n", coord->name, uj, ui);
-			return false;
-		}
-	}
-
-	fprintf(stderr, "%s: test passed\n", coord->name);
-	return true;
-}
-
 uint64_t
 trans_coord(Coordinate *coord, Trans t, uint64_t ind)
 {
@@ -686,17 +660,6 @@ genptable_setbase(Coordinate *coord)
 			coord->ptablebase = i-3;
 		sum = newsum;
 	}
-}
-
-void
-print_ptable(Coordinate *coord)
-{
-	uint64_t i;
-
-	printf("Table %s\n", coord->name);
-	printf("Base value: %d\n", coord->ptablebase);
-	for (i = 0; i < 16; i++)
-		printf("%2" PRIu64 "\t%10" PRIu64 "\n", i, coord->count[i]);
 }
 
 static uint64_t

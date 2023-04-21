@@ -6,6 +6,10 @@
 #include "solve.h"
 #include "steps.h"
 
+static bool set_step(char *, Step **);
+static bool set_solutiontype(char *, SolutionType *);
+static bool set_trans(char *, Trans *);
+
 static bool
 set_step(char *str, Step **step)
 {

@@ -5,15 +5,15 @@
 #include "coord.h"
 #include "solve.h"
 
-static void append_sol(DfsArg *arg);
-static bool allowed_next(Move move, Move l0, Move l1);
-static void get_state(Coordinate *coord[], Cube *cube, CubeState *state);
-static void copy_dfsarg(DfsArg *src, DfsArg *dst);
-static int  lower_bound(Coordinate *coord[], CubeState *state);
-static void dfs(DfsArg *arg);
-static void dfs_niss(DfsArg *arg);
-static bool dfs_move_checkstop(DfsArg *arg);
-static bool niss_makes_sense(DfsArg *arg);
+static void append_sol(DfsArg *);
+static bool allowed_next(Move m, Move l0, Move l1);
+static void get_state(Coordinate *[], Cube *, CubeState *);
+static void copy_dfsarg(DfsArg *src, DfsArg *dst); /* TODO: remove */
+static int lower_bound(Coordinate *[], CubeState *);
+static void dfs(DfsArg *);
+static void dfs_niss(DfsArg *);
+static bool dfs_move_checkstop(DfsArg *);
+static bool niss_makes_sense(DfsArg *);
 
 static void
 append_sol(DfsArg *arg)

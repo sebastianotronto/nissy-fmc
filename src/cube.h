@@ -1,10 +1,10 @@
-#define false               0
-#define true                1
-#define NMOVES              55
-#define NTRANS              48
-#define MAX_ALG_LEN         22
-#define MIN(a,b)            (((a) < (b)) ? (a) : (b))
-#define MAX(a,b)            (((a) > (b)) ? (a) : (b))
+#define false       0
+#define true        1
+#define NMOVES      55
+#define NTRANS      48
+#define MAX_ALG_LEN 22
+#define MIN(a,b)    (((a) < (b)) ? (a) : (b))
+#define MAX(a,b)    (((a) > (b)) ? (a) : (b))
 
 typedef int bool;
 typedef enum edge { UF, UL, UB, UR, DF, DL, DB, DR, FR, FL, BL, BR } Edge;
@@ -41,27 +41,27 @@ typedef struct { int n; Trans t[NTRANS]; } TransGroup;
 
 extern TransGroup tgrp_udfix;
 
-void compose(Cube *c2, Cube *c1); /* Use c2 as an alg on c1 */
-void copy_cube(Cube *src, Cube *dst);
-void invert_cube(Cube *cube);
-bool is_solved(Cube *cube);
-void make_solved(Cube *cube);
+void compose(Cube *, Cube *);
+void copy_cube(Cube *, Cube *);
+void invert_cube(Cube *);
+bool is_solved(Cube *);
+void make_solved(Cube *);
 
-Move base_move(Move m);
-bool commute(Move m1, Move m2);
-Move inverse_move(Move m);
+Move base_move(Move);
+bool commute(Move, Move);
+Move inverse_move(Move);
 
-void copy_alg(Alg *src, Alg *dst);
-void append_move(Alg *alg, Move m, bool inverse);
-void apply_move(Move m, Cube *cube);
-void apply_alg(Alg *alg, Cube *cube);
-bool apply_scramble(char *str, Cube *c);
-int alg_string(Alg *alg, char *str);
+void copy_alg(Alg *, Alg *);
+void append_move(Alg *, Move, bool);
+void apply_move(Move, Cube *);
+void apply_alg(Alg *, Cube *);
+bool apply_scramble(char *, Cube *);
+int alg_string(Alg *, char *);
 
-void apply_trans(Trans t, Cube *cube);
-Trans inverse_trans(Trans t);
-void transform_alg(Trans t, Alg *alg);
-Move transform_move(Trans t, Move m);
-Trans transform_trans(Trans t, Trans m);
+void apply_trans(Trans, Cube *);
+Trans inverse_trans(Trans);
+void transform_alg(Trans, Alg *);
+Move transform_move(Trans, Move);
+Trans transform_trans(Trans, Trans);
 
 void init_cube();

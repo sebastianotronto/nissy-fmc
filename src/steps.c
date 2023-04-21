@@ -12,10 +12,21 @@
 #define BINOM12ON4 495ULL
 #define BINOM8ON4  70ULL
 
-static bool moveset_HTM(Move m);
-static bool moveset_eofb(Move m);
-static bool moveset_drud(Move m);
-static bool moveset_htr(Move m);
+static bool moveset_HTM(Move);
+static bool moveset_eofb(Move);
+static bool moveset_drud(Move);
+static bool moveset_htr(Move);
+
+static int factorial(int);
+static int perm_to_index(int *, int);
+static void index_to_perm(int, int, int *);
+static int binomial(int, int);
+static int subset_to_index(int *, int, int);
+static void index_to_subset(int, int, int, int *);
+static int digit_array_to_int(int *, int, int);
+static void int_to_digit_array(int, int, int, int *);
+static void int_to_sum_zero_array(int, int, int, int *);
+static int perm_sign(int *, int);
 
 static uint64_t index_eofb(Cube *cube);
 static void     invindex_eofb(uint64_t ind, Cube *ret);

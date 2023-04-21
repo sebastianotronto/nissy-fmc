@@ -1,7 +1,13 @@
 #include "cube.h"
 
+static void apply_permutation(int *, int *, int, int *);
+static void sum_arrays_mod(int *, int *, int, int);
+static Move read_move(char *, int *);
+static void init_moves();
+static void init_trans();
+
 static Cube move_array[NMOVES];
-Move  moves_ttable[NTRANS][NMOVES];
+Move moves_ttable[NTRANS][NMOVES];
 Trans trans_ttable[NTRANS][NTRANS];
 Trans trans_itable[NTRANS];
 
@@ -392,8 +398,6 @@ transform_trans(Trans t, Trans m)
 {
 	return trans_ttable[t][m];
 }
-
-/* Initialization ************************************************************/
 
 static void
 init_moves() {
