@@ -10,7 +10,7 @@ main(int argc, char *argv[])
 {
 	char sols[99999];
 
-	init_nissy();
+	nissy_init();
 
 	if (argc != 6) {
 		fprintf(stderr, "Not enough arguments given\n");
@@ -23,7 +23,7 @@ main(int argc, char *argv[])
 	char *type = argv[4];
 	char *scramble = argv[5];
 
-	switch (solve(step, trans, d, type, scramble, sols)) {
+	switch (nissy_solve(step, trans, d, type, scramble, sols)) {
 	case 1:
 		fprintf(stderr, "Error parsing step: %s\n", step);
 		return -1;
