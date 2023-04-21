@@ -7,7 +7,7 @@
 #define MAX_N_COORD 3
 
 typedef enum { NORMAL, INVERSE, NISS } SolutionType;
-typedef struct { uint64_t val; Trans t; } Movable;
+typedef struct { uint64_t val; Trans t; } CubeState;
 typedef struct {
 	char *                    shortname;
 	Moveset *                 moveset;
@@ -15,7 +15,7 @@ typedef struct {
 } Step;
 typedef struct {
 	Cube *                    cube;
-	Movable                   ind[MAX_N_COORD];
+	CubeState                 state[MAX_N_COORD];
 	Step *                    s;
 	Trans                     t;
 	SolutionType              st;
@@ -29,15 +29,15 @@ typedef struct {
 	Alg *                     current_alg;
 } DfsArg;
 
-static void        append_sol(DfsArg *arg);
-static bool        allowed_next(Move move, Step *s, Move l0, Move l1);
-static void        compute_ind(DfsArg *arg);
-static void        copy_dfsarg(DfsArg *src, DfsArg *dst);
-static int         estimate_step(Step *step, Movable *ind);
-static void        dfs(DfsArg *arg);
-static void        dfs_niss(DfsArg *arg);
-static bool        dfs_move_checkstop(DfsArg *arg);
-static bool        niss_makes_sense(DfsArg *arg);
+static void append_sol(DfsArg *arg);
+static bool allowed_next(Move move, Move l0, Move l1);
+static void get_state(Coordinate *coord[], Cube *cube, CubeState *state);
+static void copy_dfsarg(DfsArg *src, DfsArg *dst);
+static int  lower_bound(Coordinate *coord[], CubeState *state);
+static void dfs(DfsArg *arg);
+static void dfs_niss(DfsArg *arg);
+static bool dfs_move_checkstop(DfsArg *arg);
+static bool niss_makes_sense(DfsArg *arg);
 
 static bool moveset_HTM(Move m);
 static bool moveset_eofb(Move m);
@@ -541,7 +541,7 @@ append_sol(DfsArg *arg)
 }
 
 static bool
-allowed_next(Move m, Step *s, Move l0, Move l1)
+allowed_next(Move m, Move l0, Move l1)
 {
 	bool p, q, allowed, order;
 
@@ -554,13 +554,12 @@ allowed_next(Move m, Step *s, Move l0, Move l1)
 }
 
 void
-compute_ind(DfsArg *arg)
+get_state(Coordinate *coord[], Cube *cube, CubeState *state)
 {
 	int i;
 
-	for (i = 0; arg->s->coord[i] != NULL; i++)
-		arg->ind[i].val = index_coord(arg->s->coord[i],
-		    arg->cube, &arg->ind[i].t);
+	for (i = 0; coord[i] != NULL; i++)
+		state[i].val = index_coord(coord[i], cube, &state[i].t);
 }
 
 static void
@@ -585,19 +584,19 @@ copy_dfsarg(DfsArg *src, DfsArg *dst)
 	}
 
 	for (i = 0; src->s->coord[i] != NULL; i++) {
-		dst->ind[i].val = src->ind[i].val;
-		dst->ind[i].t   = src->ind[i].t;
+		dst->state[i].val = src->state[i].val;
+		dst->state[i].t   = src->state[i].t;
 	}
 }
 
 static int
-estimate_step(Step *step, Movable *ind)
+lower_bound(Coordinate *coord[], CubeState *state)
 {
 	int i, ret;
 
 	ret = -1;
-	for (i = 0; step->coord[i] != NULL; i++)
-		ret = MAX(ret, ptableval(step->coord[i], ind[i].val));
+	for (i = 0; coord[i] != NULL; i++)
+		ret = MAX(ret, ptableval(coord[i], state[i].val));
 
 	return ret;
 }
@@ -623,7 +622,7 @@ dfs(DfsArg *arg)
 	for (m = U; m <= B3; m++) {
 		if (!arg->s->moveset(m))
 			continue;
-		if (allowed_next(m, arg->s, arg->last[0], arg->last[1])) {
+		if (allowed_next(m, arg->last[0], arg->last[1])) {
 			copy_dfsarg(arg, &newarg);
 			newarg.last[1] = arg->last[0];
 			newarg.last[0] = m;
@@ -659,7 +658,7 @@ dfs_niss(DfsArg *arg)
 	compose(&c, newarg.cube);
 
 	/* New indexes */
-	compute_ind(&newarg);
+	get_state(newarg.s->coord, newarg.cube, newarg.state);
 
 	/* Swap last moves */
 	for (i = 0; i < 2; i++) {
@@ -684,15 +683,15 @@ dfs_move_checkstop(DfsArg *arg)
 	/* Moving */
 	if (arg->last[0] != NULLMOVE) {
 		for (i = 0; arg->s->coord[i] != NULL; i++) {
-			mm = transform_move(arg->ind[i].t, arg->last[0]);
-			arg->ind[i].val = move_coord(arg->s->coord[i],
-			    mm, arg->ind[i].val, &tt);
-			arg->ind[i].t = transform_trans(tt, arg->ind[i].t);
+			mm = transform_move(arg->state[i].t, arg->last[0]);
+			arg->state[i].val = move_coord(arg->s->coord[i],
+			    mm, arg->state[i].val, &tt);
+			arg->state[i].t = transform_trans(tt, arg->state[i].t);
 		}
 	}
 
 	/* Computing bound for coordinates */
-	arg->bound = estimate_step(arg->s, arg->ind);
+	arg->bound = lower_bound(arg->s->coord, arg->state);
 	if (arg->st == NISS && !arg->niss)
 		arg->bound = MIN(1, arg->bound);
 
@@ -703,19 +702,16 @@ static bool
 niss_makes_sense(DfsArg *arg)
 {
 	Cube testcube;
-	DfsArg aux;
+	CubeState state[MAX_N_COORD];
 
 	if (arg->niss || !(arg->st == NISS) || arg->current_alg->len == 0)
 		return false;
 
 	make_solved(&testcube);
 	apply_move(inverse_move(arg->last[0]), &testcube);
-	aux.cube = &testcube;
-	aux.s = arg->s;
-	/* TODO: refactor compute_ind so we don't need full arg */
-	compute_ind(&aux);
+	get_state(arg->s->coord, &testcube, state);
 
-	return estimate_step(aux.s, aux.ind) > 0;
+	return lower_bound(arg->s->coord, state) > 0;
 }
 
 static bool
@@ -803,7 +799,7 @@ solve(char *step, char *trans, int d, char *type, char *scramble, char *sol)
 		invert_cube(&c);
 	apply_trans(arg.t, &c);
 	arg.cube = &c;
-	compute_ind(&arg);
+	get_state(arg.s->coord, arg.cube, arg.state);
 
 	dfs(&arg);
 	return 0;
