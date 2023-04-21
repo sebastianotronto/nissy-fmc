@@ -12,6 +12,7 @@
 static uint64_t    indexers_getind(Indexer **is, Cube *c);
 static uint64_t    indexers_getmax(Indexer **is);
 static void        indexers_makecube(Indexer **is, uint64_t ind, Cube *c);
+static int         coord_base_number(Coordinate *coord);
 static void        gen_coord_comp(Coordinate *coord);
 static void        gen_coord_sym(Coordinate *coord);
 static bool        read_coord_mtable(Coordinate *coord);
@@ -74,6 +75,16 @@ indexers_makecube(Indexer **is, uint64_t ind, Cube *c)
 		is[i]->to_cube(ind / m, c);
 		ind %= m;
 	}
+}
+
+static int
+coord_base_number(Coordinate *coord)
+{
+	int j;
+
+	for (j = 0; coord->base[j] != NULL; j++) ;
+
+	return j;
 }
 
 static void
@@ -547,14 +558,15 @@ genptable(Coordinate *coord)
 	int d, i;
 	uint64_t oldn, sz;
 
-	compact = coord->base[1] != NULL;
-	sz = ptablesize(coord) * (compact ? 2 : 1);
+	coord->compact = coord->base[1] != NULL;
+	sz = ptablesize(coord) * (coord->compact ? 2 : 1);
 	coord->ptable = malloc(sz * sizeof(entry_group_t));
 
 	if (read_ptable_file(coord))
 		return;
 
 	/* For the first steps we proceed the same way for compact and not */
+	compact = coord->compact;
 	coord->compact = false;
 
 	fprintf(stderr, "Generating pt_%s\n", coord->name); 
@@ -726,10 +738,9 @@ ptableval(Coordinate *coord, uint64_t ind)
 		e  = ENTRIES_PER_GROUP_COMPACT;
 		sh = (ind % e) * 2;
 		ret = (coord->ptable[ind/e] & (3 << sh)) >> sh;
-		if (ret != coord->ptablebase)
-			return ret;
-		for (j = 0; coord->base[j] != NULL; j++) ;
-		for ( ; j >= 0; j--) {
+		if (ret != 0)
+			return ret + coord->ptablebase;
+		for (j = coord_base_number(coord); j >= 0; j--) {
 			ii = ind % coord->base[j]->max;
 			ret = MAX(ret, ptableval(coord->base[j], ii));
 			ind /= coord->base[j]->max;
@@ -760,7 +771,6 @@ read_ptable_file(Coordinate *coord)
 	for (i = 0; i < 16; i++)
 		r += fread(&(coord->count[i]), sizeof(uint64_t), 1, f);
 	r += fread(coord->ptable, sizeof(entry_group_t), ptablesize(coord), f);
-
 	fclose(f);
 
 	return r == 17 + ptablesize(coord);
