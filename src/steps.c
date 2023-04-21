@@ -5,6 +5,13 @@
 #include "coord.h"
 #include "solve.h"
 
+#define POW2TO11   2048ULL
+#define POW3TO7    2187ULL
+#define FACTORIAL4 24ULL
+#define FACTORIAL8 40320ULL
+#define BINOM12ON4 495ULL
+#define BINOM8ON4  70ULL
+
 static bool moveset_HTM(Move m);
 static bool moveset_eofb(Move m);
 static bool moveset_drud(Move m);
