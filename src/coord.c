@@ -383,6 +383,7 @@ gen_coord(Coordinate *coord)
 	if (coord == NULL || coord->generated)
 		return;
 
+	/* TODO: for SYM_COORD, we do not want to save base to file */
 	for (i = 0; i < 2; i++)
 		gen_coord(coord->base[i]);
 

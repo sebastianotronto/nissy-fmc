@@ -171,9 +171,9 @@ Coordinate coord_drudfin_noE_sym16 = {
 };
 
 Coordinate *coordinates[] = {
-	&coord_eofb, &coord_coud, &coord_cp, &coord_epos, &coord_epe,
-	&coord_eposepe, &coord_epud, &coord_eofbepos, &coord_eofbepos_sym16,
-	&coord_drud_sym16, &coord_cp_sym16, &coord_drudfin_noE_sym16,
+	&coord_eofb, &coord_coud, &coord_cp_sym16, &coord_epos, &coord_epe,
+	&coord_eposepe, &coord_epud, &coord_eofbepos_sym16,
+	&coord_drud_sym16, &coord_drudfin_noE_sym16,
 	NULL
 };
 

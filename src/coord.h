@@ -15,6 +15,7 @@ typedef struct coordinate {
 	uint64_t *ttable[NTRANS];
 	TransGroup *tgrp;
 	struct coordinate *base[2];
+
 	uint64_t *symclass;
 	uint64_t *symrep;
 	Trans *transtorep;
@@ -22,14 +23,14 @@ typedef struct coordinate {
 
 	bool generated;
 	Indexer *i[99];
-	uint64_t *selfsim; /* used only in fixnasty */
+	uint64_t *selfsim;
 
-	Moveset *moveset; /* for pruning, mt and compressing */
+	Moveset *moveset;
 	uint64_t updated;
 	entry_group_t *ptable;
-	int ptablebase; /* Renamed */
-	bool compact; /* Only needed for generation, maybe keep */
-	uint64_t count[16]; /* Only needed for generation and print */
+	int ptablebase;
+	bool compact;
+	uint64_t count[16];
 } Coordinate;
 
 void gen_coord(Coordinate *);
