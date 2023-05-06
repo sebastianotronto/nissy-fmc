@@ -1,12 +1,9 @@
-#define false       0
-#define true        1
 #define NMOVES      55
 #define NTRANS      48
 #define MAX_ALG_LEN 22
 #define MIN(a,b)    (((a) < (b)) ? (a) : (b))
 #define MAX(a,b)    (((a) > (b)) ? (a) : (b))
 
-typedef int bool;
 typedef enum edge { UF, UL, UB, UR, DF, DL, DB, DR, FR, FL, BL, BR } Edge;
 typedef enum { UFR, UFL, UBL, UBR, DFR, DFL, DBL, DBR } Corner;
 typedef enum {
