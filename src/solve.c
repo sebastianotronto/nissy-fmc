@@ -1,4 +1,4 @@
-#include <string.h>
+#include <stddef.h>
 #include <inttypes.h>
 
 #include "cube.h"

@@ -1,5 +1,5 @@
-#include <string.h>
 #include <inttypes.h>
+#include <stddef.h>
 
 #include "cube.h"
 #include "coord.h"

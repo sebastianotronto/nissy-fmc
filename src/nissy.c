@@ -1,5 +1,5 @@
-#include <string.h>
 #include <inttypes.h>
+#include <stddef.h>
 
 #include "cube.h"
 #include "coord.h"
@@ -9,6 +9,19 @@
 static bool set_step(char *, Step **);
 static bool set_solutiontype(char *, SolutionType *);
 static bool set_trans(char *, Trans *);
+static bool strequal(char *, char *);
+
+static bool
+strequal(char *s1, char *s2)
+{
+	int i;
+
+	for (i = 0; s1[i] && s2[i]; i++)
+		if (s1[i] != s2[i])
+			return false;
+	
+	return true;
+}
 
 static bool
 set_step(char *str, Step **step)
@@ -16,7 +29,7 @@ set_step(char *str, Step **step)
 	int i;
 
 	for (i = 0; steps[i] != NULL; i++) {
-		if (!strcmp(steps[i]->shortname, str)) {
+		if (strequal(steps[i]->shortname, str)) {
 			*step = steps[i];
 			return true;
 		}
@@ -28,15 +41,15 @@ set_step(char *str, Step **step)
 static bool
 set_solutiontype(char *str, SolutionType *st)
 {
-	if (!strcmp(str, "normal")) {
+	if (strequal(str, "normal")) {
 		*st = NORMAL;
 		return true;
 	}
-	if (!strcmp(str, "inverse")) {
+	if (strequal(str, "inverse")) {
 		*st = INVERSE;
 		return true;
 	}
-	if (!strcmp(str, "niss")) {
+	if (strequal(str, "niss")) {
 		*st = NISS;
 		return true;
 	}
@@ -47,15 +60,15 @@ set_solutiontype(char *str, SolutionType *st)
 static bool
 set_trans(char *str, Trans *t)
 {
-	if (!strcmp(str, "uf")) {
+	if (strequal(str, "uf")) {
 		*t = uf;
 		return true;
 	}
-	if (!strcmp(str, "fr")) {
+	if (strequal(str, "fr")) {
 		*t = fr;
 		return true;
 	}
-	if (!strcmp(str, "rd")) {
+	if (strequal(str, "rd")) {
 		*t = rd;
 		return true;
 	}

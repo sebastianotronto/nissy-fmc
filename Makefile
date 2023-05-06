@@ -6,7 +6,9 @@ PREFIX = /usr/local
 
 CPPFLAGS = -DVERSION=\"${VERSION}\"
 CFLAGS = -std=c99 -pedantic -Wall -Wextra -Wno-unused-parameter -O3 ${CPPFLAGS}
-DBFLAGS = -std=c99 -pedantic -Wall -Wextra -Wno-unused-parameter -g ${CPPFLAGS}
+DBFLAGS = -std=c99 -pedantic -Wall -Wextra -Wno-unused-parameter \
+          -Wno-unused-function -fsanitize=address -fsanitize=undefined \
+	  -g3 ${CPPFLAGS}
 
 CC = cc
 
