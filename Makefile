@@ -10,7 +10,7 @@ DBFLAGS = -std=c99 -pedantic -Wall -Wextra -Wno-unused-parameter \
           -Wno-unused-function -fsanitize=address -fsanitize=undefined \
 	  -g3 ${CPPFLAGS}
 
-CC = cc
+CC = clang
 
 all: nissy
 

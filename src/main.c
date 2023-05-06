@@ -37,7 +37,7 @@ main(int argc, char *argv[])
 		fprintf(stderr, "Error applying scramble: %s\n", scramble);
 		return -1;
 	default:
-		printf(sols);
+		printf("%s", sols);
 	}
 
 	return 0;

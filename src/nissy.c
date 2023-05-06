@@ -94,7 +94,7 @@ nissy_solve(char *step, char *trans, int d, char *type, char *scramble, char *so
 }
 
 void
-nissy_init()
+nissy_init(void)
 {
 	int i;
 

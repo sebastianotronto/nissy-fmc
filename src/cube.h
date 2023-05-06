@@ -64,4 +64,4 @@ void transform_alg(Trans, Alg *);
 Move transform_move(Trans, Move);
 Trans transform_trans(Trans, Trans);
 
-void init_cube();
+void init_cube(void);

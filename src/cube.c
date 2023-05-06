@@ -3,8 +3,8 @@
 static void apply_permutation(int *, int *, int, int *);
 static void sum_arrays_mod(int *, int *, int, int);
 static Move read_move(char *, int *);
-static void init_moves();
-static void init_trans();
+static void init_moves(void);
+static void init_trans(void);
 
 static Cube move_array[NMOVES];
 Move moves_ttable[NTRANS][NMOVES];
@@ -400,7 +400,7 @@ transform_trans(Trans t, Trans m)
 }
 
 static void
-init_moves() {
+init_moves(void) {
 	Move m;
 
 	/* Moves are represented as cubes and applied using compose().
@@ -509,7 +509,7 @@ init_moves() {
 }
 
 static void
-init_trans() {
+init_trans(void) {
 	Cube aux, cube;
 	Move mi, move;
 	Trans t, u, v;
@@ -557,7 +557,7 @@ init_trans() {
 }
 
 void
-init_cube()
+init_cube(void)
 {
 	init_moves();
 	init_trans();
