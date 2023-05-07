@@ -9,7 +9,6 @@
 static void append_sol(DfsArg *);
 static bool allowed_next(Move m, Move l0, Move l1);
 static void get_state(Coordinate *[], Cube *, CubeState *);
-static void copy_dfsarg(DfsArg *src, DfsArg *dst); /* TODO: remove */
 static int lower_bound(Coordinate *[], CubeState *);
 static void dfs(DfsArg *);
 static void dfs_niss(DfsArg *);
@@ -57,32 +56,6 @@ get_state(Coordinate *coord[], Cube *cube, CubeState *state)
 		state[i].val = index_coord(coord[i], cube, &state[i].t);
 }
 
-static void
-copy_dfsarg(DfsArg *src, DfsArg *dst)
-{
-	int i;
-
-	dst->cube        = src->cube;
-	dst->s           = src->s;
-	dst->t           = src->t;
-	dst->st          = src->st;
-	dst->d           = src->d;
-	dst->niss        = src->niss;
-	dst->has_nissed  = src->has_nissed;
-	dst->sol         = src->sol;
-	dst->current_alg = src->current_alg;
-
-	for (i = 0; i < 2; i++) {
-		dst->last[i]    = src->last[i];
-		dst->lastinv[i] = src->lastinv[i];
-	}
-
-	for (i = 0; src->s->coord[i] != NULL; i++) {
-		dst->state[i].val = src->state[i].val;
-		dst->state[i].t   = src->state[i].t;
-	}
-}
-
 static int
 lower_bound(Coordinate *coord[], CubeState *state)
 {
@@ -98,8 +71,7 @@ lower_bound(Coordinate *coord[], CubeState *state)
 static void
 dfs(DfsArg *arg)
 {
-	Move m;
-	DfsArg newarg;
+	Move m, last[2];
 	bool len, niss;
 	int bound;
 
@@ -118,19 +90,23 @@ dfs(DfsArg *arg)
 		return;
 	}
 
+	last[0] = arg->last[0];
+	last[1] = arg->last[1];
+	arg->last[1] = arg->last[0];
 	for (m = U; m <= B3; m++) {
 		if (!arg->s->moveset(m))
 			continue;
-		if (allowed_next(m, arg->last[0], arg->last[1])) {
-			copy_dfsarg(arg, &newarg);
-			newarg.last[1] = arg->last[0];
-			newarg.last[0] = m;
-			append_move(arg->current_alg, m, newarg.niss);
-			dfs_move(m, &newarg);
-			dfs(&newarg);
+		if (allowed_next(m, last[0], last[1])) {
+			arg->last[0] = m;
+			append_move(arg->current_alg, m, arg->niss);
+			dfs_move(m, arg);
+			dfs(arg);
+			dfs_move(inverse_move(m), arg);
 			arg->current_alg->len--;
 		}
 	}
+	arg->last[0] = last[0];
+	arg->last[1] = last[1];
 
 	if (niss_makes_sense(arg))
 		dfs_niss(arg);
@@ -142,9 +118,13 @@ dfs_niss(DfsArg *arg)
 	int i;
 	DfsArg newarg;
 	Cube c, newcube;
-	Move aux;
 
-	copy_dfsarg(arg, &newarg);
+	newarg.s           = arg->s;
+	newarg.t           = arg->t;
+	newarg.st          = arg->st;
+	newarg.d           = arg->d;
+	newarg.sol         = arg->sol;
+	newarg.current_alg = arg->current_alg;
 
 	/* Invert current alg and scramble */
 	newarg.cube = &newcube;
@@ -162,12 +142,11 @@ dfs_niss(DfsArg *arg)
 
 	/* Swap last moves */
 	for (i = 0; i < 2; i++) {
-		aux = newarg.last[i];
-		newarg.last[i] = newarg.lastinv[i];
-		newarg.lastinv[i] = aux;
+		newarg.last[i] = arg->lastinv[i];
+		newarg.lastinv[i] = arg->last[i];
 	}
 
-	newarg.niss = !(arg->niss);
+	newarg.niss = true;
 	newarg.has_nissed = true;
 
 	dfs(&newarg);
