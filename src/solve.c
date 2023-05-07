@@ -172,6 +172,7 @@ niss_makes_sense(DfsArg *arg)
 {
 	Cube testcube;
 	CubeState state[MAX_N_COORD];
+	bool b1, b2, comm;
 
 	if (arg->niss || !(arg->st == NISS) || arg->current_alg->len == 0)
 		return false;
@@ -179,8 +180,16 @@ niss_makes_sense(DfsArg *arg)
 	make_solved(&testcube);
 	apply_move(inverse_move(arg->last[0]), &testcube);
 	get_state(arg->s->coord, &testcube, state);
+	b1 = lower_bound(arg->s->coord, state) > 0;
 
-	return lower_bound(arg->s->coord, state) > 0;
+	make_solved(&testcube);
+	apply_move(inverse_move(arg->last[1]), &testcube);
+	get_state(arg->s->coord, &testcube, state);
+	b2 = lower_bound(arg->s->coord, state) > 0;
+
+	comm = commute(arg->last[0], arg->last[1]);
+
+	return b1 > 0 && !(comm && b2 == 0);
 }
 
 int
