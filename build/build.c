@@ -46,6 +46,7 @@ gen_coord_comp(Coordinate *coord)
 			coord->mtable[m][ui] = indexers_getind(coord->i, &mvd);
 		}
 	}
+	fprintf(stderr, "\t(%" PRIu64 " done)\n", coord->max);
 
 	fprintf(stderr, "%s: generating ttable\n", coord->name);
 	alloc_ttable(coord);
@@ -59,6 +60,7 @@ gen_coord_comp(Coordinate *coord)
 			coord->ttable[t][ui] = indexers_getind(coord->i, &mvd);
 		}
 	}
+	fprintf(stderr, "\t(%" PRIu64 " done)\n", coord->max);
 }
 
 static void
@@ -120,6 +122,7 @@ gen_coord_sym(Coordinate *coord)
 			coord->ttrep_move[m][ui] = coord->transtorep[uj];
 		}
 	}
+	fprintf(stderr, "\t(%" PRIu64 " done)\n", coord->max);
 }
 
 void
