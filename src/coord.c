@@ -8,10 +8,6 @@
 
 typedef void (Copier)(void *, void *, size_t);
 
-
-/* TODO: remove coord_base_number once possible */
-static int coord_base_number(Coordinate *);
-
 static size_t copy_coord_sd(Coordinate *, char *, Copier *);
 static size_t copy_coord_mtable(Coordinate *, char *, Copier *);
 static size_t copy_coord_ttrep_move(Coordinate *, char *, Copier *);
@@ -64,16 +60,6 @@ indexers_makecube(Indexer **is, uint64_t ind, Cube *c)
 		is[i]->to_cube(ind / m, c);
 		ind %= m;
 	}
-}
-
-static int
-coord_base_number(Coordinate *coord)
-{
-	int j;
-
-	for (j = 0; coord->base[j] != NULL; j++) ;
-
-	return j;
 }
 
 void
@@ -368,7 +354,9 @@ ptableval(Coordinate *coord, uint64_t ind)
 		ret = (coord->ptable[ind/e] & (3 << sh)) >> sh;
 		if (ret != 0)
 			return ret + coord->ptablebase;
-		for (j = coord_base_number(coord); j >= 0; j--) {
+		for (j = 0; j < 2 && coord->base[j] != NULL; j++) ;
+		j--;
+		for ( ; j >= 0; j--) {
 			ii = ind % coord->base[j]->max;
 			ret = MAX(ret, ptableval(coord->base[j], ii));
 			ind /= coord->base[j]->max;
@@ -426,8 +414,10 @@ copy_coord(Coordinate *coord, char *buf, bool alloc, Copier *copy)
 
 		break;
 	case SYMCOMP_COORD:
-		if (alloc)
+		if (alloc) {
+			coord->max = coord->base[0]->max * coord->base[1]->max;
 			alloc_ptable(coord, false);
+		}
 		b += copy_ptable(coord, &buf[b], copy);
 
 		break;
