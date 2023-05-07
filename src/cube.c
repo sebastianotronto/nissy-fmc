@@ -1,4 +1,5 @@
 #include <stdbool.h>
+
 #include "cube.h"
 
 static void apply_permutation(int *, int *, int, int *);

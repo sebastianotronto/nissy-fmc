@@ -1,8 +1,10 @@
 #include <inttypes.h>
 #include <stdbool.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+// TODO: remove
+#include <stdio.h>
 
 #include "cube.h"
 #include "coord.h"
