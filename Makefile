@@ -18,14 +18,20 @@ CC = clang
 all: nissy
 
 clean:
-	rm -f nissy
+	rm -rf nissy
 
 nissy: clean
-	mkdir -p tables
 	${CC} ${CFLAGS} -o nissy src/*.c
 
 debug:
-	${CC} ${DBFLAGS} -o nissy src/*.c
+	${CC} ${DBFLAGS} -o nissy cli/*.c src/*.c
 
-.PHONY: all clean debug
+cleantables:
+	rm -rf tables
 
+tables: cleantables
+	${CC} ${DBFLAGS} -o buildtables build/*.c src/*.c
+	./buildtables
+	rm buildtables
+
+.PHONY: all clean cleantables debug

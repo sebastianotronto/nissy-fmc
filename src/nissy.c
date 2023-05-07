@@ -64,6 +64,19 @@ set_trans(char *str, Trans *t)
 	return false;
 }
 
+void
+nissy_init(char *buf)
+{
+	int i;
+	size_t b;
+
+	init_cube();
+
+	b = 0;
+	for (i = 0; coordinates[i] != NULL; i++)
+		b += read_coord(coordinates[i], &buf[b]);
+}
+
 int
 nissy_solve(char *step, char *trans, int d, char *type, char *scramble, char *sol)
 {
@@ -79,15 +92,4 @@ nissy_solve(char *step, char *trans, int d, char *type, char *scramble, char *so
 	if (!apply_scramble(scramble, &c)) return 5;
 
 	return solve(s, t, d, st, &c, sol);
-}
-
-void
-nissy_init(void)
-{
-	int i;
-
-	init_cube();
-
-	for (i = 0; coordinates[i] != NULL; i++)
-		gen_coord(coordinates[i]);
 }

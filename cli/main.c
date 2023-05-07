@@ -1,16 +1,28 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "nissy.h"
+#include "../src/nissy.h"
 
 #define MAX_SOLS 999
+
+static char buf[TABLESFILESIZE];
 
 int
 main(int argc, char *argv[])
 {
 	char sols[99999];
+	FILE *file;
+	long size;
 
-	nissy_init();
+	if ((file = fopen("tables", "rb")) == NULL)
+		return -2;
+
+	fseek(file, 0, SEEK_END);
+	size = ftell(file);
+	rewind(file);
+	fread(buf, 1, size, file);
+
+	nissy_init(buf);
 
 	if (argc != 6) {
 		fprintf(stderr, "Not enough arguments given\n");

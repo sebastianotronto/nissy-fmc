@@ -3,39 +3,25 @@
 #include <stdlib.h>
 #include <string.h>
 
-// TODO: remove
-#include <stdio.h>
-
 #include "cube.h"
 #include "coord.h"
 
-#define ENTRIES_PER_GROUP         (2*sizeof(entry_group_t))
-#define ENTRIES_PER_GROUP_COMPACT (4*sizeof(entry_group_t))
+typedef void (Copier)(void *, void *, size_t);
 
-static uint64_t indexers_getind(Indexer **, Cube *);
-static uint64_t indexers_getmax(Indexer **);
-static void indexers_makecube(Indexer **, uint64_t, Cube *);
+
+/* TODO: remove coord_base_number once possible */
 static int coord_base_number(Coordinate *);
-static void gen_coord_comp(Coordinate *);
-static void gen_coord_sym(Coordinate *);
-static bool read_coord_mtable(Coordinate *);
-static bool read_coord_sd(Coordinate *);
-static bool read_coord_ttable(Coordinate *);
-static bool write_coord_mtable(Coordinate *);
-static bool write_coord_sd(Coordinate *);
-static bool write_coord_ttable(Coordinate *);
 
-static void genptable(Coordinate *);
-static void genptable_bfs(Coordinate *, int);
-static void fixnasty(Coordinate *, uint64_t, int);
-static void genptable_compress(Coordinate *);
-static void genptable_setbase(Coordinate *);
-static uint64_t ptablesize(Coordinate *);
-static void ptable_update(Coordinate *, uint64_t, int);
-static bool read_ptable_file(Coordinate *);
-static bool write_ptable_file(Coordinate *);
+static size_t copy_coord_sd(Coordinate *, char *, Copier *);
+static size_t copy_coord_mtable(Coordinate *, char *, Copier *);
+static size_t copy_coord_ttrep_move(Coordinate *, char *, Copier *);
+static size_t copy_coord_ttable(Coordinate *, char *, Copier *);
+static size_t copy_ptable(Coordinate *, char *, Copier *);
 
-static uint64_t
+static void readin  (void *t, void *b, size_t n) { memcpy(t, b, n); }
+static void writeout(void *t, void *b, size_t n) { memcpy(b, t, n); }
+
+uint64_t
 indexers_getmax(Indexer **is)
 {
 	int i;
@@ -47,7 +33,7 @@ indexers_getmax(Indexer **is)
 	return max;
 }
 
-static uint64_t
+uint64_t
 indexers_getind(Indexer **is, Cube *c)
 {
 	int i;
@@ -61,7 +47,7 @@ indexers_getind(Indexer **is, Cube *c)
 	return max;
 }
 
-static void
+void
 indexers_makecube(Indexer **is, uint64_t ind, Cube *c)
 {
 	/* Warning: anti-indexers are applied in the same order as indexers. */
@@ -90,335 +76,147 @@ coord_base_number(Coordinate *coord)
 	return j;
 }
 
-static void
-gen_coord_comp(Coordinate *coord)
+void
+alloc_sd(Coordinate *coord, bool gen)
 {
-	uint64_t ui;
-	Cube c, mvd;
-	Move m;
-	Trans t;
+	size_t M;
 
-	coord->max = indexers_getmax(coord->i);
+	M = coord->base[0]->max;
+	coord->symclass = malloc(M * sizeof(uint64_t));
+	coord->transtorep = malloc(M * sizeof(Trans));
+	if (gen) {
+		coord->selfsim = malloc(M * sizeof(uint64_t));
+		coord->symrep = malloc(M * sizeof(uint64_t));
+	}
+}
+
+void
+alloc_mtable(Coordinate *coord)
+{
+	Move m;
 
 	for (m = 0; m < NMOVES; m++)
 		coord->mtable[m] = malloc(coord->max * sizeof(uint64_t));
+}
+
+void
+alloc_ttrep_move(Coordinate *coord)
+{
+	Move m;
+
+	for (m = 0; m < NMOVES; m++)
+		coord->ttrep_move[m] = malloc(coord->max * sizeof(Trans));
+}
+
+void
+alloc_ttable(Coordinate *coord)
+{
+	Trans t;
 
 	for (t = 0; t < NTRANS; t++)
 		coord->ttable[t] = malloc(coord->max * sizeof(uint64_t));
-
-	if (!read_coord_mtable(coord)) {
-		fprintf(stderr, "%s: generating mtable\n", coord->name);
-
-		for (ui = 0; ui < coord->max; ui++) {
-			indexers_makecube(coord->i, ui, &c);
-			for (m = 0; m < NMOVES; m++) {
-				copy_cube(&c, &mvd);
-				apply_move(m, &mvd);
-				coord->mtable[m][ui] =
-				    indexers_getind(coord->i, &mvd);
-			}
-		}
-		if (!write_coord_mtable(coord))
-			fprintf(stderr, "%s: error writing mtable\n",
-			    coord->name);
-		
-		fprintf(stderr, "%s: mtable generated\n", coord->name);
-	}
-
-	if (!read_coord_ttable(coord)) {
-		fprintf(stderr, "%s: generating ttable\n", coord->name);
-
-		for (ui = 0; ui < coord->max; ui++) {
-			indexers_makecube(coord->i, ui, &c);
-			for (t = 0; t < NTRANS; t++) {
-				copy_cube(&c, &mvd);
-				apply_trans(t, &mvd);
-				coord->ttable[t][ui] =
-				    indexers_getind(coord->i, &mvd);
-			}
-		}
-		if (!write_coord_ttable(coord))
-			fprintf(stderr, "%s: error writing ttable\n",
-			    coord->name);
-	}
 }
-
-static void
-gen_coord_sym(Coordinate *coord)
-{
-	uint64_t i, in, ui, uj, uu, M, nr;
-	int j;
-	Move m;
-	Trans t;
-
-	M = coord->base[0]->max;
-	coord->selfsim    = malloc(M * sizeof(uint64_t));
-	coord->symclass   = malloc(M * sizeof(uint64_t));
-	coord->symrep     = malloc(M * sizeof(uint64_t));
-	coord->transtorep = malloc(M * sizeof(Trans));
-
-	if (!read_coord_sd(coord)) {
-		fprintf(stderr, "%s: generating syms\n", coord->name);
-
-		for (i = 0; i < M; i++)
-			coord->symclass[i] = M+1;
-
-		for (i = 0, nr = 0; i < M; i++) {
-			if (coord->symclass[i] != M+1)
-				continue;
-
-			coord->symrep[nr]    = i;
-			coord->transtorep[i] = uf;
-			coord->selfsim[nr]   = (uint64_t)0;
-			for (j = 0; j < coord->tgrp->n; j++) {
-				t = coord->tgrp->t[j];
-				in = trans_coord(coord->base[0], t, i);
-				coord->symclass[in] = nr;
-				if (in == i)
-					coord->selfsim[nr] |= ((uint64_t)1<<t);
-				else
-					coord->transtorep[in] =
-					    inverse_trans(t);
-			}
-			nr++;
-		}
-
-		coord->max = nr;
-
-		fprintf(stderr, "%s: found %" PRIu64 " classes\n",
-		    coord->name, nr);
-		if (!write_coord_sd(coord))
-			fprintf(stderr, "%s: error writing symdata\n",
-			    coord->name);
-	}
-
-	coord->symrep = realloc(coord->symrep, coord->max*sizeof(uint64_t));
-	coord->selfsim = realloc(coord->selfsim, coord->max*sizeof(uint64_t));
-
-	for (m = 0; m < NMOVES; m++) {
-		coord->mtable[m] = malloc(coord->max*sizeof(uint64_t));
-		coord->ttrep_move[m] = malloc(coord->max*sizeof(Trans));
-	}
-
-	if (!read_coord_mtable(coord)) {
-		for (ui = 0; ui < coord->max; ui++) {
-			uu = coord->symrep[ui];
-			for (m = 0; m < NMOVES; m++) {
-				uj = move_coord(coord->base[0], m, uu, NULL);
-				coord->mtable[m][ui] = coord->symclass[uj];
-				coord->ttrep_move[m][ui] =
-				    coord->transtorep[uj];
-			}
-		}
-		if (!write_coord_mtable(coord))
-			fprintf(stderr, "%s: error writing mtable\n",
-			    coord->name);
-	}
-}
-
-static bool
-read_coord_mtable(Coordinate *coord)
-{
-	FILE *f;
-	char fname[256];
-	Move m;
-	uint64_t M;
-	bool r;
-
-	strcpy(fname, "tables/mt_");
-	strcat(fname, coord->name);
-
-	if ((f = fopen(fname, "rb")) == NULL)
-		return false;
-
-	M = coord->max;
-	r = true;
-	for (m = 0; m < NMOVES; m++)
-		r = r && fread(coord->mtable[m], sizeof(uint64_t), M, f) == M;
-
-	if (coord->type == SYM_COORD)
-		for (m = 0; m < NMOVES; m++)
-			r = r && fread(coord->ttrep_move[m],
-			    sizeof(Trans), M, f) == M;
-
-	fclose(f);
-	return r;
-}
-
-static bool
-read_coord_sd(Coordinate *coord)
-{
-	FILE *f;
-	char fname[256];
-	uint64_t M, N;
-	bool r;
-
-	strcpy(fname, "tables/sd_");
-	strcat(fname, coord->name);
-
-	if ((f = fopen(fname, "rb")) == NULL)
-		return false;
-
-	r = true;
-	r = r && fread(&coord->max,       sizeof(uint64_t), 1, f) == 1;
-	M = coord->max;
-	N = coord->base[0]->max;
-	r = r && fread(coord->symrep,     sizeof(uint64_t), M, f) == M;
-	r = r && fread(coord->selfsim,    sizeof(uint64_t), M, f) == M;
-	r = r && fread(coord->symclass,   sizeof(uint64_t), N, f) == N;
-	r = r && fread(coord->transtorep, sizeof(Trans),    N, f) == N;
-
-	fclose(f);
-	return r;
-}
-
-static bool
-read_coord_ttable(Coordinate *coord)
-{
-	FILE *f;
-	char fname[256];
-	Trans t;
-	uint64_t M;
-	bool r;
-
-	strcpy(fname, "tables/tt_");
-	strcat(fname, coord->name);
-
-	if ((f = fopen(fname, "rb")) == NULL)
-		return false;
-
-	M = coord->max;
-	r = true;
-	for (t = 0; t < NTRANS; t++)
-		r = r && fread(coord->ttable[t], sizeof(uint64_t), M, f) == M;
-
-	fclose(f);
-	return r;
-}
-
-static bool
-write_coord_mtable(Coordinate *coord)
-{
-	FILE *f;
-	char fname[256];
-	Move m;
-	uint64_t M;
-	bool r;
-
-	strcpy(fname, "tables/mt_");
-	strcat(fname, coord->name);
-
-	if ((f = fopen(fname, "wb")) == NULL)
-		return false;
-
-	M = coord->max;
-	r = true;
-	for (m = 0; m < NMOVES; m++)
-		r = r && fwrite(coord->mtable[m], sizeof(uint64_t), M, f) == M;
-
-	if (coord->type == SYM_COORD)
-		for (m = 0; m < NMOVES; m++)
-			r = r && fwrite(coord->ttrep_move[m],
-			    sizeof(Trans), M, f) == M;
-
-	fclose(f);
-	return r;
-}
-
-static bool
-write_coord_sd(Coordinate *coord)
-{
-	FILE *f;
-	char fname[256];
-	uint64_t M, N;
-	bool r;
-
-	strcpy(fname, "tables/sd_");
-	strcat(fname, coord->name);
-
-	if ((f = fopen(fname, "wb")) == NULL)
-		return false;
-
-	r = true;
-	M = coord->max;
-	N = coord->base[0]->max;
-	r = r && fwrite(&coord->max,       sizeof(uint64_t), 1, f) == 1;
-	r = r && fwrite(coord->symrep,     sizeof(uint64_t), M, f) == M;
-	r = r && fwrite(coord->selfsim,    sizeof(uint64_t), M, f) == M;
-	r = r && fwrite(coord->symclass,   sizeof(uint64_t), N, f) == N;
-	r = r && fwrite(coord->transtorep, sizeof(Trans),    N, f) == N;
-
-	fclose(f);
-	return r;
-}
-
-static bool
-write_coord_ttable(Coordinate *coord)
-{
-	FILE *f;
-	char fname[256];
-	Trans t;
-	uint64_t M;
-	bool r;
-
-	strcpy(fname, "tables/tt_");
-	strcat(fname, coord->name);
-
-	if ((f = fopen(fname, "wb")) == NULL)
-		return false;
-
-	M = coord->max;
-	r = true;
-	for (t = 0; t < NTRANS; t++)
-		r = r && fwrite(coord->ttable[t], sizeof(uint64_t), M, f) == M;
-
-	fclose(f);
-	return r;
-}
-
-/* Public functions **********************************************************/
 
 void
-gen_coord(Coordinate *coord)
+alloc_ptable(Coordinate *coord, bool gen)
 {
-	int i;
+	size_t sz;
 
-	if (coord == NULL || coord->generated)
-		return;
+	coord->compact = coord->base[1] != NULL;
+	sz = ptablesize(coord) * (coord->compact && gen ? 2 : 1);
+	coord->ptable = malloc(sz * sizeof(entry_group_t));
+}
 
-	/* TODO: for SYM_COORD, we do not want to save base to file */
-	for (i = 0; i < 2; i++)
-		gen_coord(coord->base[i]);
+static size_t
+copy_coord_mtable(Coordinate *coord, char *buf, Copier *copy)
+{
+	Move m;
+	size_t b, rowsize;
 
-	switch (coord->type) {
-	case COMP_COORD:
-		if (coord->i[0] == NULL)
-			goto error_gc;
-		gen_coord_comp(coord);
-		break;
-	case SYM_COORD:
-		if (coord->base[0] == NULL || coord->tgrp == NULL)
-			goto error_gc;
-		gen_coord_sym(coord);
-		break;
-	case SYMCOMP_COORD:
-		if (coord->base[0] == NULL || coord->base[1] == NULL)
-			goto error_gc;
-		coord->max = coord->base[0]->max * coord->base[1]->max;
-		break;
-	default:
-		break;
+	b = 0;
+	rowsize = coord->max * sizeof(uint64_t);
+	for (m = 0; m < NMOVES; m++) {
+		copy(coord->mtable[m], &buf[b], rowsize);
+		b += rowsize;
 	}
 
-	coord->generated = true;
-	genptable(coord);
+	return b;
+}
 
-	return;
+static size_t
+copy_coord_ttrep_move(Coordinate *coord, char *buf, Copier *copy)
+{
+	Move m;
+	size_t b, rowsize;
 
-error_gc:
-	fprintf(stderr, "Error generating coordinates.\n"
-			"This is a bug, pleae report.\n");
-	exit(1);
+	b = 0;
+	rowsize = coord->max * sizeof(Trans);
+	for (m = 0; m < NMOVES; m++) {
+		copy(coord->ttrep_move[m], &buf[b], rowsize);
+		b += rowsize;
+	}
+
+	return b;
+}
+
+static size_t
+copy_coord_sd(Coordinate *coord, char *buf, Copier *copy)
+{
+	size_t b, size_max, rowsize_ttr, rowsize_symc;
+
+	b = 0;
+
+	size_max = sizeof(uint64_t);
+	copy(&coord->max, &buf[b], size_max);
+	b += size_max;
+
+	rowsize_ttr = coord->base[0]->max * sizeof(Trans);
+	copy(coord->transtorep, &buf[b], rowsize_ttr);
+	b += rowsize_ttr;
+
+	rowsize_symc = coord->base[0]->max * sizeof(uint64_t);
+	copy(coord->symclass, &buf[b], rowsize_symc);
+	b += rowsize_symc;
+
+	return b;
+}
+
+static size_t
+copy_coord_ttable(Coordinate *coord, char *buf, Copier *copy)
+{
+	Trans t;
+	size_t b, rowsize;
+
+	b = 0;
+	rowsize = coord->max * sizeof(uint64_t);
+	for (t = 0; t < NTRANS; t++) {
+		copy(coord->ttable[t], &buf[b], rowsize);
+		b += rowsize;
+	}
+
+	return b;
+}
+
+static size_t
+copy_ptable(Coordinate *coord, char *buf, Copier *copy)
+{
+	size_t b, size_base, size_count, size_ptable;
+
+	b = 0;
+
+	size_base = sizeof(coord->ptablebase);
+	copy(&coord->ptablebase, &buf[b], size_base);
+	b += size_base;
+
+	size_count = 16 * sizeof(uint64_t);
+	copy(&coord->count, &buf[b], size_count);
+	b += size_count;
+
+	size_ptable = ptablesize(coord) * sizeof(entry_group_t);
+	copy(coord->ptable, &buf[b], size_ptable);
+	b += size_ptable;
+
+	return b;
 }
 
 uint64_t
@@ -529,144 +327,7 @@ trans_coord(Coordinate *coord, Trans t, uint64_t ind)
 	return coord->max; /* Only reached in case of error */
 }
 
-static void
-genptable(Coordinate *coord)
-{
-	bool compact;
-	int d, i;
-	uint64_t oldn, sz;
-
-	coord->compact = coord->base[1] != NULL;
-	sz = ptablesize(coord) * (coord->compact ? 2 : 1);
-	coord->ptable = malloc(sz * sizeof(entry_group_t));
-
-	if (read_ptable_file(coord))
-		return;
-
-	/* For the first steps we proceed the same way for compact and not */
-	compact = coord->compact;
-	coord->compact = false;
-
-	fprintf(stderr, "Generating pt_%s\n", coord->name); 
-
-	/* TODO: replace with loop */
-	memset(coord->ptable, ~(uint8_t)0,
-	    ptablesize(coord)*sizeof(entry_group_t));
-	for (i = 0; i < 16; i++)
-		coord->count[i] = 0;
-
-	coord->updated = 0;
-	oldn = 0;
-	ptable_update(coord, 0, 0);
-	fixnasty(coord, 0, 0);
-	fprintf(stderr, "Depth %d done, generated %"
-		PRIu64 "\t(%" PRIu64 "/%" PRIu64 ")\n",
-		0, coord->updated - oldn, coord->updated, coord->max);
-	oldn = coord->updated;
-	coord->count[0] = coord->updated;
-	for (d = 0; d < 15 && coord->updated < coord->max; d++) {
-		genptable_bfs(coord, d);
-		fprintf(stderr, "Depth %d done, generated %"
-			PRIu64 "\t(%" PRIu64 "/%" PRIu64 ")\n",
-			d+1, coord->updated-oldn, coord->updated, coord->max);
-		coord->count[d+1] = coord->updated - oldn;
-		oldn = coord->updated;
-	}
-	fprintf(stderr, "Pruning table generated!\n");
-	
-	genptable_setbase(coord);
-	if (compact)
-		genptable_compress(coord);
-
-	if (!write_ptable_file(coord))
-		fprintf(stderr, "Error writing ptable file\n");
-}
-
-static void
-genptable_bfs(Coordinate *coord, int d)
-{
-	uint64_t i, ii;
-	int pval;
-	Move m;
-
-	for (i = 0; i < coord->max; i++) {
-		pval = ptableval(coord, i);
-		if (pval != d)
-			continue;
-		for (m = U; m <= B3; m++) {
-			if (!coord->moveset(m))
-				continue;
-			ii = move_coord(coord, m, i, NULL);
-			ptable_update(coord, ii, d+1);
-			fixnasty(coord, ii, d+1);
-		}
-	}
-}
-
-static void
-fixnasty(Coordinate *coord, uint64_t i, int d)
-{
-	uint64_t ii, ss, M;
-	int j;
-	Trans t;
-
-	if (coord->type != SYMCOMP_COORD)
-		return;
-
-	M = coord->base[1]->max;
-	ss = coord->base[0]->selfsim[i/M];
-	for (j = 0; j < coord->base[0]->tgrp->n; j++) {
-		t = coord->base[0]->tgrp->t[j];
-		if (t == uf || !(ss & ((uint64_t)1<<t)))
-			continue;
-		ii = trans_coord(coord, t, i);
-		ptable_update(coord, ii, d);
-	}
-}
-
-static void
-genptable_compress(Coordinate *coord)
-{
-	int val;
-	uint64_t i, j;
-	entry_group_t mask, v;
-
-	fprintf(stderr, "Compressing table to 2 bits per entry\n");
-
-	for (i = 0; i < coord->max; i += ENTRIES_PER_GROUP_COMPACT) {
-		mask = (entry_group_t)0;
-		for (j = 0; j < ENTRIES_PER_GROUP_COMPACT; j++) {
-			if (i+j >= coord->max)
-				break;
-			val = ptableval(coord, i+j) - coord->ptablebase;
-			v = (entry_group_t)MIN(3, MAX(0, val));
-			mask |= v << (2*j);
-		}
-		coord->ptable[i/ENTRIES_PER_GROUP_COMPACT] = mask;
-	}
-
-	coord->compact = true;
-	coord->ptable = realloc(coord->ptable,
-	    sizeof(entry_group_t)*ptablesize(coord));
-}
-
-static void
-genptable_setbase(Coordinate *coord)
-{
-	int i;
-	uint64_t sum, newsum;
-
-	coord->ptablebase = 0;
-	sum = coord->count[0] + coord->count[1] + coord->count[2];
-	for (i = 3; i < 16; i++) {
-		newsum = sum + coord->count[i] - coord->count[i-3];
-		if (newsum > sum)
-			coord->ptablebase = i-3;
-		sum = newsum;
-	}
-}
-
-static uint64_t
+size_t
 ptablesize(Coordinate *coord)
 {
 	uint64_t e;
@@ -676,8 +337,8 @@ ptablesize(Coordinate *coord)
 	return (coord->max + e - 1) / e;
 }
 
-static void
-ptable_update(Coordinate *coord, uint64_t ind, int n)
+void
+ptableupdate(Coordinate *coord, uint64_t ind, int n)
 {
 	int sh;
 	entry_group_t mask;
@@ -720,48 +381,71 @@ ptableval(Coordinate *coord, uint64_t ind)
 	return (coord->ptable[ind/e] & (15 << sh)) >> sh;
 }
 
-static bool
-read_ptable_file(Coordinate *coord)
+static size_t
+copy_coord(Coordinate *coord, char *buf, bool alloc, Copier *copy)
 {
-	FILE *f;
-	char fname[256];
-	int i;
-	uint64_t r;
+	size_t b;
 
-	strcpy(fname, "tables/pt_");
-	strcat(fname, coord->name);
+	b = 0;
+	switch (coord->type) {
+	case COMP_COORD:
+		if (alloc) {
+			coord->max = indexers_getmax(coord->i);
+			alloc_mtable(coord);
+		}
+		b += copy_coord_mtable(coord, &buf[b], copy);
 
-	if ((f = fopen(fname, "rb")) == NULL)
-		return false;
+		if (alloc)
+			alloc_ttable(coord);
+		b += copy_coord_ttable(coord, &buf[b], copy);
 
-	r = fread(&(coord->ptablebase), sizeof(int), 1, f);
-	for (i = 0; i < 16; i++)
-		r += fread(&(coord->count[i]), sizeof(uint64_t), 1, f);
-	r += fread(coord->ptable, sizeof(entry_group_t), ptablesize(coord), f);
-	fclose(f);
+		if (alloc)
+			alloc_ptable(coord, false);
+		b += copy_ptable(coord, &buf[b], copy);
 
-	return r == 17 + ptablesize(coord);
+		break;
+	case SYM_COORD:
+		if (alloc) {
+			coord->base[0]->max =
+			    indexers_getmax(coord->base[0]->i);
+			alloc_sd(coord, false);
+		}
+		b += copy_coord_sd(coord, &buf[b], copy);
+
+		if (alloc)
+			alloc_mtable(coord);
+		b += copy_coord_mtable(coord, &buf[b], copy);
+
+		if (alloc)
+			alloc_ttrep_move(coord);
+		b += copy_coord_ttrep_move(coord, &buf[b], copy);
+
+		if (alloc)
+			alloc_ptable(coord, false);
+		b += copy_ptable(coord, &buf[b], copy);
+
+		break;
+	case SYMCOMP_COORD:
+		if (alloc)
+			alloc_ptable(coord, false);
+		b += copy_ptable(coord, &buf[b], copy);
+
+		break;
+	default:
+		break;
+	}
+
+	return b;
 }
 
-static bool
-write_ptable_file(Coordinate *coord)
+size_t
+read_coord(Coordinate *coord, char *buf)
 {
-	FILE *f;
-	char fname[256];
-	int i;
-	uint64_t w;
+	return copy_coord(coord, buf, true, readin);
+}
 
-	strcpy(fname, "tables/pt_");
-	strcat(fname, coord->name);
-
-	if ((f = fopen(fname, "wb")) == NULL)
-		return false;
-
-	w = fwrite(&(coord->ptablebase), sizeof(int), 1, f);
-	for (i = 0; i < 16; i++)
-		w += fwrite(&(coord->count[i]), sizeof(uint64_t), 1, f);
-	w += fwrite(coord->ptable, sizeof(entry_group_t), ptablesize(coord), f);
-	fclose(f);
-
-	return w == 17 + ptablesize(coord);
+size_t
+write_coord(Coordinate *coord, char *buf)
+{
+	return copy_coord(coord, buf, false, writeout);
 }
