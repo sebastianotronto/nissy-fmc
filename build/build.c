@@ -131,10 +131,12 @@ gen_coord(Coordinate *coord)
 		return;
 
 	fprintf(stderr, "%s: gen_coord started\n", coord->name);
-	for (i = 0; coord->base[i] != NULL; i++) {
-		fprintf(stderr, "%s: generating base[%d] = %s\n",
-		    coord->name, i, coord->base[i]->name);
-		gen_coord(coord->base[i]);
+	for (i = 0; i < 2; i++) {
+		if (coord->base[i] != NULL) {
+			fprintf(stderr, "%s: generating base[%d] = %s\n",
+			    coord->name, i, coord->base[i]->name);
+			gen_coord(coord->base[i]);
+		}
 	}
 
 	switch (coord->type) {
