@@ -28,11 +28,17 @@ gen_coord_comp(Coordinate *coord)
 	Move m;
 	Trans t;
 
+	fprintf(stderr, "%s: generating COMP coordinate\n", coord->name);
+
 	coord->max = indexers_getmax(coord->i);
 
-	/* Generating mtable */
+	fprintf(stderr, "%s: size is %" PRIu64 "\n", coord->name, coord->max);
+
+	fprintf(stderr, "%s: generating mtable\n", coord->name);
 	alloc_mtable(coord);
 	for (ui = 0; ui < coord->max; ui++) {
+		if (ui % 100000 == 0)
+			fprintf(stderr, "\t(%" PRIu64 " done)\n", ui);
 		indexers_makecube(coord->i, ui, &c);
 		for (m = 0; m < NMOVES; m++) {
 			copy_cube(&c, &mvd);
@@ -41,9 +47,11 @@ gen_coord_comp(Coordinate *coord)
 		}
 	}
 
-	/* Generating ttable */
+	fprintf(stderr, "%s: generating ttable\n", coord->name);
 	alloc_ttable(coord);
 	for (ui = 0; ui < coord->max; ui++) {
+		if (ui % 100000 == 0)
+			fprintf(stderr, "\t(%" PRIu64 " done)\n", ui);
 		indexers_makecube(coord->i, ui, &c);
 		for (t = 0; t < NTRANS; t++) {
 			copy_cube(&c, &mvd);
@@ -61,9 +69,11 @@ gen_coord_sym(Coordinate *coord)
 	Move m;
 	Trans t;
 
+	fprintf(stderr, "%s: generating SYM coordinate\n", coord->name);
+
 	alloc_sd(coord, true);
 
-	/* Generating symdata */
+	fprintf(stderr, "%s: generating symdata\n", coord->name);
 	for (i = 0; i < coord->base[0]->max; i++)
 		coord->symclass[i] = coord->base[0]->max + 1;
 	for (i = 0, nr = 0; i < coord->base[0]->max; i++) {
@@ -87,6 +97,9 @@ gen_coord_sym(Coordinate *coord)
 
 	coord->max = nr;
 
+	fprintf(stderr, "%s: number of classes is %" PRIu64 "\n",
+	    coord->name, coord->max);
+
 	/* Reallocating for maximum number of classes found */
 	/* TODO: remove, not needed anymore because not writing to file */
 	/*
@@ -94,10 +107,12 @@ gen_coord_sym(Coordinate *coord)
 	coord->selfsim = realloc(coord->selfsim, coord->max*sizeof(uint64_t));
 	*/
 
-	/* Generating mtable and ttrep_move */
+	fprintf(stderr, "%s: generating mtable and ttrep_move\n", coord->name);
 	alloc_mtable(coord);
 	alloc_ttrep_move(coord);
 	for (ui = 0; ui < coord->max; ui++) {
+		if (ui % 100000 == 0)
+			fprintf(stderr, "\t(%" PRIu64 " done)\n", ui);
 		uu = coord->symrep[ui];
 		for (m = 0; m < NMOVES; m++) {
 			uj = move_coord(coord->base[0], m, uu, NULL);
@@ -115,9 +130,12 @@ gen_coord(Coordinate *coord)
 	if (coord == NULL || coord->generated)
 		return;
 
-	/* TODO: for SYM_COORD, we do not want to save base to file */
-	for (i = 0; i < 2; i++)
+	fprintf(stderr, "%s: gen_coord started\n", coord->name);
+	for (i = 0; coord->base[i] != NULL; i++) {
+		fprintf(stderr, "%s: generating base[%d] = %s\n",
+		    coord->name, i, coord->base[i]->name);
 		gen_coord(coord->base[i]);
+	}
 
 	switch (coord->type) {
 	case COMP_COORD:
@@ -142,11 +160,12 @@ gen_coord(Coordinate *coord)
 	coord->generated = true;
 	gen_ptable(coord);
 
+	fprintf(stderr, "%s: gen_coord completed\n", coord->name);
+
 	return;
 
 error_gc:
-	fprintf(stderr, "Error generating coordinates.\n"
-			"This is a bug, pleae report.\n");
+	fprintf(stderr, "Error generating coordinates.\n");
 	exit(1);
 }
 
@@ -155,7 +174,7 @@ gen_ptable(Coordinate *coord)
 {
 	bool compact;
 	int d, i;
-	uint64_t oldn;
+	uint64_t oldn, sz;
 
 	alloc_ptable(coord, true);
 
@@ -163,10 +182,10 @@ gen_ptable(Coordinate *coord)
 	compact = coord->compact;
 	coord->compact = false;
 
-	fprintf(stderr, "Generating pt_%s\n", coord->name); 
+	fprintf(stderr, "%s: generating ptable\n", coord->name); 
 
-	memset(coord->ptable, ~(uint8_t)0,
-	    ptablesize(coord)*sizeof(entry_group_t));
+	sz = ptablesize(coord) * sizeof(entry_group_t);
+	memset(coord->ptable, ~(uint8_t)0, sz);
 	for (i = 0; i < 16; i++)
 		coord->count[i] = 0;
 
@@ -174,24 +193,28 @@ gen_ptable(Coordinate *coord)
 	oldn = 0;
 	ptableupdate(coord, 0, 0);
 	gen_ptable_fixnasty(coord, 0, 0);
-	fprintf(stderr, "Depth %d done, generated %"
+	fprintf(stderr, "\tDepth %d done, generated %"
 		PRIu64 "\t(%" PRIu64 "/%" PRIu64 ")\n",
 		0, coord->updated - oldn, coord->updated, coord->max);
 	oldn = coord->updated;
 	coord->count[0] = coord->updated;
 	for (d = 0; d < 15 && coord->updated < coord->max; d++) {
 		gen_ptable_bfs(coord, d);
-		fprintf(stderr, "Depth %d done, generated %"
+		fprintf(stderr, "\tDepth %d done, generated %"
 			PRIu64 "\t(%" PRIu64 "/%" PRIu64 ")\n",
 			d+1, coord->updated-oldn, coord->updated, coord->max);
 		coord->count[d+1] = coord->updated - oldn;
 		oldn = coord->updated;
 	}
-	fprintf(stderr, "Pruning table generated!\n");
 	
 	gen_ptable_setbase(coord);
-	if (compact)
+
+	if (compact) {
+		fprintf(stderr, "%s: compressing ptable\n", coord->name);
 		gen_ptable_compress(coord);
+	}
+
+	fprintf(stderr, "%s: ptable generated\n", coord->name);
 }
 
 static void

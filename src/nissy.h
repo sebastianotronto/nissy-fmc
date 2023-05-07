@@ -1,5 +1,5 @@
 /* TODO: find a better way to define this */
-#define TABLESFILESIZE 50000000 /* 50Mb */
+#define TABLESFILESIZE 150000000 /* 150Mb */
 
 void nissy_init(char *);
 
