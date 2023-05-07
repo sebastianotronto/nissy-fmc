@@ -15,7 +15,6 @@ typedef struct {
 	SolutionType st;
 	char **sol;
 	int d;
-	int bound;
 	bool niss;
 	bool has_nissed;
 	Move last[2];

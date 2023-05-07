@@ -13,7 +13,7 @@ static void copy_dfsarg(DfsArg *src, DfsArg *dst); /* TODO: remove */
 static int lower_bound(Coordinate *[], CubeState *);
 static void dfs(DfsArg *);
 static void dfs_niss(DfsArg *);
-static bool dfs_move_checkstop(DfsArg *);
+static void dfs_move(Move, DfsArg *);
 static bool niss_makes_sense(DfsArg *);
 
 static void
@@ -67,7 +67,6 @@ copy_dfsarg(DfsArg *src, DfsArg *dst)
 	dst->t           = src->t;
 	dst->st          = src->st;
 	dst->d           = src->d;
-	dst->bound       = src->bound; /* In theory not needed */
 	dst->niss        = src->niss;
 	dst->has_nissed  = src->has_nissed;
 	dst->sol         = src->sol;
@@ -102,11 +101,16 @@ dfs(DfsArg *arg)
 	Move m;
 	DfsArg newarg;
 	bool len, niss;
+	int bound;
 
-	if (dfs_move_checkstop(arg))
+	bound = lower_bound(arg->s->coord, arg->state);
+	if (arg->st == NISS && !arg->niss)
+		bound = MIN(1, bound);
+
+	if (bound + arg->current_alg->len > arg->d)
 		return;
 
-	if (arg->bound == 0) {
+	if (bound == 0) {
 		len = arg->current_alg->len == arg->d;
 		niss = !(arg->st == NISS) || arg->has_nissed;
 		if (len && niss)
@@ -122,6 +126,7 @@ dfs(DfsArg *arg)
 			newarg.last[1] = arg->last[0];
 			newarg.last[0] = m;
 			append_move(arg->current_alg, m, newarg.niss);
+			dfs_move(m, &newarg);
 			dfs(&newarg);
 			arg->current_alg->len--;
 		}
@@ -168,29 +173,19 @@ dfs_niss(DfsArg *arg)
 	dfs(&newarg);
 }
 
-static bool
-dfs_move_checkstop(DfsArg *arg)
+static void
+dfs_move(Move m, DfsArg *arg)
 {
 	int i;
 	Move mm;
 	Trans tt = uf; /* Avoid uninitialized warning */
 
-	/* Moving */
-	if (arg->last[0] != NULLMOVE) {
-		for (i = 0; arg->s->coord[i] != NULL; i++) {
-			mm = transform_move(arg->state[i].t, arg->last[0]);
-			arg->state[i].val = move_coord(arg->s->coord[i],
-			    mm, arg->state[i].val, &tt);
-			arg->state[i].t = transform_trans(tt, arg->state[i].t);
-		}
+	for (i = 0; arg->s->coord[i] != NULL; i++) {
+		mm = transform_move(arg->state[i].t, m);
+		arg->state[i].val = move_coord(
+		    arg->s->coord[i], mm, arg->state[i].val, &tt);
+		arg->state[i].t = transform_trans(tt, arg->state[i].t);
 	}
-
-	/* Computing bound for coordinates */
-	arg->bound = lower_bound(arg->s->coord, arg->state);
-	if (arg->st == NISS && !arg->niss)
-		arg->bound = MIN(1, arg->bound);
-
-	return arg->bound + arg->current_alg->len > arg->d ;
 }
 
 static bool
