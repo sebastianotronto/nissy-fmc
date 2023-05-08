@@ -8,12 +8,12 @@ static Move read_move(char *, int *);
 static void init_moves(void);
 static void init_trans(void);
 
-static Cube move_array[NMOVES];
-Move moves_ttable[NTRANS][NMOVES];
+static Cube move_array[NMOVES_ALL];
+Move moves_ttable[NTRANS][NMOVES_ALL];
 Trans trans_ttable[NTRANS][NTRANS];
 Trans trans_itable[NTRANS];
 
-static char move_string[NMOVES][7] = {
+static char move_string[NMOVES_ALL][7] = {
 	[NULLMOVE] = "-",
 	[U]  = "U",  [U2]  = "U2",  [U3]  = "U\'",
 	[D]  = "D",  [D2]  = "D2",  [D3]  = "D\'",
@@ -231,7 +231,7 @@ read_move(char *str, int *i)
 	Move j, m;
 	char upper, lower, inv;
 
-	for (j = U; j < NMOVES; j++) {
+	for (j = U; j < NMOVES_ALL; j++) {
 		upper = move_string[j][0];
 		lower = upper - ('A' - 'a');
 		if (str[*i] == upper || (str[*i] == lower && j <= B)) {
@@ -408,7 +408,7 @@ init_moves(void) {
 	/* Moves are represented as cubes and applied using compose().
 	 * Every move is translated to a an <U, x, y> alg before filling
 	 * the transition tables. */
-	char equiv_alg_string[100][NMOVES] = {
+	char equiv_alg_string[100][NMOVES_ALL] = {
 		[NULLMOVE] = "",
 
 		[U]   = "        U           ",
@@ -493,7 +493,7 @@ init_moves(void) {
 	move_array[x] = mcx;
 	move_array[y] = mcy;
 
-	for (m = 0; m < NMOVES; m++) {
+	for (m = 0; m < NMOVES_ALL; m++) {
 		switch (m) {
 		case NULLMOVE:
 			make_solved(&move_array[m]);
@@ -517,11 +517,11 @@ init_trans(void) {
 	Trans t, u, v;
 
 	for (t = 0; t < NTRANS; t++) {
-		for (mi = 0; mi < NMOVES; mi++) {
+		for (mi = 0; mi < NMOVES_ALL; mi++) {
 			make_solved(&aux);
 			apply_move(mi, &aux);
 			apply_trans(t, &aux);
-			for (move = 0; move < NMOVES; move++) {
+			for (move = 0; move < NMOVES_ALL; move++) {
 				copy_cube(&aux, &cube);
 				apply_move(inverse_move(move), &cube);
 				if (is_solved(&cube)) {

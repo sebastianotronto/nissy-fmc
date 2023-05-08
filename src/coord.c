@@ -81,7 +81,7 @@ alloc_mtable(Coordinate *coord)
 {
 	Move m;
 
-	for (m = 0; m < NMOVES; m++)
+	for (m = 0; m < NMOVES_HTM; m++)
 		coord->mtable[m] = malloc(coord->max * sizeof(uint64_t));
 }
 
@@ -90,7 +90,7 @@ alloc_ttrep_move(Coordinate *coord)
 {
 	Move m;
 
-	for (m = 0; m < NMOVES; m++)
+	for (m = 0; m < NMOVES_HTM; m++)
 		coord->ttrep_move[m] = malloc(coord->max * sizeof(Trans));
 }
 
@@ -121,7 +121,7 @@ copy_coord_mtable(Coordinate *coord, char *buf, Copier *copy)
 
 	b = 0;
 	rowsize = coord->max * sizeof(uint64_t);
-	for (m = 0; m < NMOVES; m++) {
+	for (m = 0; m < NMOVES_HTM; m++) {
 		copy(coord->mtable[m], &buf[b], rowsize);
 		b += rowsize;
 	}
@@ -137,7 +137,7 @@ copy_coord_ttrep_move(Coordinate *coord, char *buf, Copier *copy)
 
 	b = 0;
 	rowsize = coord->max * sizeof(Trans);
-	for (m = 0; m < NMOVES; m++) {
+	for (m = 0; m < NMOVES_HTM; m++) {
 		copy(coord->ttrep_move[m], &buf[b], rowsize);
 		b += rowsize;
 	}

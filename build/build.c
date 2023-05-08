@@ -40,7 +40,7 @@ gen_coord_comp(Coordinate *coord)
 		if (ui % 100000 == 0)
 			fprintf(stderr, "\t(%" PRIu64 " done)\n", ui);
 		indexers_makecube(coord->i, ui, &c);
-		for (m = 0; m < NMOVES; m++) {
+		for (m = 0; m < NMOVES_HTM; m++) {
 			copy_cube(&c, &mvd);
 			apply_move(m, &mvd);
 			coord->mtable[m][ui] = indexers_getind(coord->i, &mvd);
@@ -116,7 +116,7 @@ gen_coord_sym(Coordinate *coord)
 		if (ui % 100000 == 0)
 			fprintf(stderr, "\t(%" PRIu64 " done)\n", ui);
 		uu = coord->symrep[ui];
-		for (m = 0; m < NMOVES; m++) {
+		for (m = 0; m < NMOVES_HTM; m++) {
 			uj = move_coord(coord->base[0], m, uu, NULL);
 			coord->mtable[m][ui] = coord->symclass[uj];
 			coord->ttrep_move[m][ui] = coord->transtorep[uj];

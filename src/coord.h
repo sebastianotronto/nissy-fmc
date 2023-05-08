@@ -13,7 +13,7 @@ typedef struct coordinate {
 	char *name;
 	CoordType type;
 	uint64_t max;
-	uint64_t *mtable[NMOVES];
+	uint64_t *mtable[NMOVES_HTM];
 	uint64_t *ttable[NTRANS];
 	TransGroup *tgrp;
 	struct coordinate *base[2];
@@ -21,7 +21,7 @@ typedef struct coordinate {
 	uint64_t *symclass;
 	uint64_t *symrep;
 	Trans *transtorep;
-	Trans *ttrep_move[NMOVES];
+	Trans *ttrep_move[NMOVES_HTM];
 
 	bool generated;
 	Indexer *i[99];

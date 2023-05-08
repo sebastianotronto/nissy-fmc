@@ -1,4 +1,5 @@
-#define NMOVES      55
+#define NMOVES_ALL  55
+#define NMOVES_HTM  19
 #define NTRANS      48
 #define MAX_ALG_LEN 22
 #define MIN(a,b)    (((a) < (b)) ? (a) : (b))
