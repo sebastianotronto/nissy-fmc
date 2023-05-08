@@ -29,56 +29,56 @@ static void int_to_digit_array(int, int, int, int *);
 static void int_to_sum_zero_array(int, int, int, int *);
 static int perm_sign(int *, int);
 
-static uint64_t index_eofb(Cube *cube);
-static void     invindex_eofb(uint64_t ind, Cube *ret);
+static coord_value_t index_eofb(Cube *cube);
+static void     invindex_eofb(coord_value_t ind, Cube *ret);
 Indexer i_eofb = {
 	.n       = POW2TO11,
 	.index   = index_eofb,
 	.to_cube = invindex_eofb,
 };
 
-static uint64_t index_coud(Cube *cube);
-static void     invindex_coud(uint64_t ind, Cube *ret);
+static coord_value_t index_coud(Cube *cube);
+static void     invindex_coud(coord_value_t ind, Cube *ret);
 Indexer i_coud = {
 	.n       = POW3TO7,
 	.index   = index_coud,
 	.to_cube = invindex_coud,
 };
 
-static uint64_t index_cp(Cube *cube);
-static void     invindex_cp(uint64_t ind, Cube *ret);
+static coord_value_t index_cp(Cube *cube);
+static void     invindex_cp(coord_value_t ind, Cube *ret);
 Indexer i_cp = {
 	.n       = FACTORIAL8,
 	.index   = index_cp,
 	.to_cube = invindex_cp,
 };
 
-static uint64_t index_epos(Cube *cube);
-static void     invindex_epos(uint64_t ind, Cube *ret);
+static coord_value_t index_epos(Cube *cube);
+static void     invindex_epos(coord_value_t ind, Cube *ret);
 Indexer i_epos = {
 	.n       = BINOM12ON4,
 	.index   = index_epos,
 	.to_cube = invindex_epos,
 };
 
-static uint64_t index_epe(Cube *cube);
-static void     invindex_epe(uint64_t ind, Cube *ret);
+static coord_value_t index_epe(Cube *cube);
+static void     invindex_epe(coord_value_t ind, Cube *ret);
 Indexer i_epe = {
 	.n       = FACTORIAL4,
 	.index   = index_epe,
 	.to_cube = invindex_epe,
 };
 
-static uint64_t index_eposepe(Cube *cube);
-static void     invindex_eposepe(uint64_t ind, Cube *ret);
+static coord_value_t index_eposepe(Cube *cube);
+static void     invindex_eposepe(coord_value_t ind, Cube *ret);
 Indexer i_eposepe = {
 	.n       = BINOM12ON4 * FACTORIAL4,
 	.index   = index_eposepe,
 	.to_cube = invindex_eposepe,
 };
 
-static uint64_t index_epud(Cube *cube);
-static void     invindex_epud(uint64_t ind, Cube *ret);
+static coord_value_t index_epud(Cube *cube);
+static void     invindex_epud(coord_value_t ind, Cube *ret);
 Indexer i_epud = {
 	.n       = FACTORIAL8,
 	.index   = index_epud,
@@ -384,25 +384,25 @@ perm_sign(int *a, int n)
 	return ret % 2;
 }
 
-static uint64_t
+static coord_value_t
 index_eofb(Cube *cube)
 {
-	return (uint64_t)digit_array_to_int(cube->eo, 11, 2);
+	return (coord_value_t)digit_array_to_int(cube->eo, 11, 2);
 }
 
-static uint64_t
+static coord_value_t
 index_coud(Cube *cube)
 {
-	return (uint64_t)digit_array_to_int(cube->co, 7, 3);
+	return (coord_value_t)digit_array_to_int(cube->co, 7, 3);
 }
 
-static uint64_t
+static coord_value_t
 index_cp(Cube *cube)
 {
-	return (uint64_t)perm_to_index(cube->cp, 8);
+	return (coord_value_t)perm_to_index(cube->cp, 8);
 }
 
-static uint64_t
+static coord_value_t
 index_epe(Cube *cube)
 {
 	int i, e[4];
@@ -410,16 +410,16 @@ index_epe(Cube *cube)
 	for (i = 0; i < 4; i++)
 		e[i] = cube->ep[i+8] - 8;
 
-	return (uint64_t)perm_to_index(e, 4);
+	return (coord_value_t)perm_to_index(e, 4);
 }
 
-static uint64_t
+static coord_value_t
 index_epud(Cube *cube)
 {
-	return (uint64_t)perm_to_index(cube->ep, 8);
+	return (coord_value_t)perm_to_index(cube->ep, 8);
 }
 
-static uint64_t
+static coord_value_t
 index_epos(Cube *cube)
 {
 	int i, a[12];
@@ -427,44 +427,44 @@ index_epos(Cube *cube)
 	for (i = 0; i < 12; i++)
 		a[i] = (cube->ep[i] < 8) ? 0 : 1;
 
-	return (uint64_t)subset_to_index(a, 12, 4);
+	return (coord_value_t)subset_to_index(a, 12, 4);
 }
 
-static uint64_t
+static coord_value_t
 index_eposepe(Cube *cube)
 {
 	int i, j, e[4];
-	uint64_t epos, epe;
+	coord_value_t epos, epe;
 
-	epos = (uint64_t)index_epos(cube);
+	epos = (coord_value_t)index_epos(cube);
 	for (i = 0, j = 0; i < 12; i++)
 		if (cube->ep[i] >= 8)
 			e[j++] = cube->ep[i] - 8;
-	epe = (uint64_t)perm_to_index(e, 4);
+	epe = (coord_value_t)perm_to_index(e, 4);
 
 	return epos * FACTORIAL4 + epe;
 }
 
 static void
-invindex_eofb(uint64_t ind, Cube *cube)
+invindex_eofb(coord_value_t ind, Cube *cube)
 {
 	int_to_sum_zero_array(ind, 2, 12, cube->eo);
 }
 
 static void
-invindex_coud(uint64_t ind, Cube *cube)
+invindex_coud(coord_value_t ind, Cube *cube)
 {
 	int_to_sum_zero_array(ind, 3, 8, cube->co);
 }
 
 static void
-invindex_cp(uint64_t ind, Cube *cube)
+invindex_cp(coord_value_t ind, Cube *cube)
 {
 	index_to_perm(ind, 8, cube->cp);
 }
 
 static void
-invindex_epe(uint64_t ind, Cube *cube)
+invindex_epe(coord_value_t ind, Cube *cube)
 {
 	int i;
 
@@ -474,13 +474,13 @@ invindex_epe(uint64_t ind, Cube *cube)
 }
 
 static void
-invindex_epud(uint64_t ind, Cube *cube)
+invindex_epud(coord_value_t ind, Cube *cube)
 {
 	index_to_perm(ind, 8, cube->ep);
 }
 
 static void
-invindex_epos(uint64_t ind, Cube *cube)
+invindex_epos(coord_value_t ind, Cube *cube)
 {
 	int i, j, k;
 
@@ -493,10 +493,10 @@ invindex_epos(uint64_t ind, Cube *cube)
 }
 
 static void
-invindex_eposepe(uint64_t ind, Cube *cube)
+invindex_eposepe(coord_value_t ind, Cube *cube)
 {
 	int i, j, k, e[4];
-	uint64_t epos, epe;
+	coord_value_t epos, epe;
 
 	epos = ind / FACTORIAL4;
 	epe = ind % FACTORIAL4;

@@ -17,11 +17,11 @@ static size_t copy_ptable(Coordinate *, char *, Copier *);
 static void readin  (void *t, void *b, size_t n) { memcpy(t, b, n); }
 static void writeout(void *t, void *b, size_t n) { memcpy(b, t, n); }
 
-uint64_t
+coord_value_t
 indexers_getmax(Indexer **is)
 {
 	int i;
-	uint64_t max = 1;
+	coord_value_t max = 1;
 
 	for (i = 0; is[i] != NULL; i++)
 		max *= is[i]->n;
@@ -29,11 +29,11 @@ indexers_getmax(Indexer **is)
 	return max;
 }
 
-uint64_t
+coord_value_t
 indexers_getind(Indexer **is, Cube *c)
 {
 	int i;
-	uint64_t max = 0;
+	coord_value_t max = 0;
 
 	for (i = 0; is[i] != NULL; i++) {
 		max *= is[i]->n;
@@ -44,14 +44,14 @@ indexers_getind(Indexer **is, Cube *c)
 }
 
 void
-indexers_makecube(Indexer **is, uint64_t ind, Cube *c)
+indexers_makecube(Indexer **is, coord_value_t ind, Cube *c)
 {
 	/* Warning: anti-indexers are applied in the same order as indexers. */
 	/* We assume order does not matter, but it would make more sense to  */
 	/* Apply them in reverse.                                            */
 
 	int i;
-	uint64_t m;
+	coord_value_t m;
 
 	make_solved(c);
 	m = indexers_getmax(is);
@@ -68,11 +68,11 @@ alloc_sd(Coordinate *coord, bool gen)
 	size_t M;
 
 	M = coord->base[0]->max;
-	coord->symclass = malloc(M * sizeof(uint64_t));
+	coord->symclass = malloc(M * sizeof(coord_value_t));
 	coord->transtorep = malloc(M * sizeof(Trans));
 	if (gen) {
-		coord->selfsim = malloc(M * sizeof(uint64_t));
-		coord->symrep = malloc(M * sizeof(uint64_t));
+		coord->selfsim = malloc(M * sizeof(coord_value_t));
+		coord->symrep = malloc(M * sizeof(coord_value_t));
 	}
 }
 
@@ -82,7 +82,7 @@ alloc_mtable(Coordinate *coord)
 	Move m;
 
 	for (m = 0; m < NMOVES_HTM; m++)
-		coord->mtable[m] = malloc(coord->max * sizeof(uint64_t));
+		coord->mtable[m] = malloc(coord->max * sizeof(coord_value_t));
 }
 
 void
@@ -100,7 +100,7 @@ alloc_ttable(Coordinate *coord)
 	Trans t;
 
 	for (t = 0; t < NTRANS; t++)
-		coord->ttable[t] = malloc(coord->max * sizeof(uint64_t));
+		coord->ttable[t] = malloc(coord->max * sizeof(coord_value_t));
 }
 
 void
@@ -120,7 +120,7 @@ copy_coord_mtable(Coordinate *coord, char *buf, Copier *copy)
 	size_t b, rowsize;
 
 	b = 0;
-	rowsize = coord->max * sizeof(uint64_t);
+	rowsize = coord->max * sizeof(coord_value_t);
 	for (m = 0; m < NMOVES_HTM; m++) {
 		copy(coord->mtable[m], &buf[b], rowsize);
 		b += rowsize;
@@ -152,7 +152,7 @@ copy_coord_sd(Coordinate *coord, char *buf, Copier *copy)
 
 	b = 0;
 
-	size_max = sizeof(uint64_t);
+	size_max = sizeof(coord_value_t);
 	copy(&coord->max, &buf[b], size_max);
 	b += size_max;
 
@@ -160,7 +160,7 @@ copy_coord_sd(Coordinate *coord, char *buf, Copier *copy)
 	copy(coord->transtorep, &buf[b], rowsize_ttr);
 	b += rowsize_ttr;
 
-	rowsize_symc = coord->base[0]->max * sizeof(uint64_t);
+	rowsize_symc = coord->base[0]->max * sizeof(coord_value_t);
 	copy(coord->symclass, &buf[b], rowsize_symc);
 	b += rowsize_symc;
 
@@ -174,7 +174,7 @@ copy_coord_ttable(Coordinate *coord, char *buf, Copier *copy)
 	size_t b, rowsize;
 
 	b = 0;
-	rowsize = coord->max * sizeof(uint64_t);
+	rowsize = coord->max * sizeof(coord_value_t);
 	for (t = 0; t < NTRANS; t++) {
 		copy(coord->ttable[t], &buf[b], rowsize);
 		b += rowsize;
@@ -194,7 +194,7 @@ copy_ptable(Coordinate *coord, char *buf, Copier *copy)
 	copy(&coord->ptablebase, &buf[b], size_base);
 	b += size_base;
 
-	size_count = 16 * sizeof(uint64_t);
+	size_count = 16 * sizeof(coord_value_t);
 	copy(&coord->count, &buf[b], size_count);
 	b += size_count;
 
@@ -205,10 +205,10 @@ copy_ptable(Coordinate *coord, char *buf, Copier *copy)
 	return b;
 }
 
-uint64_t
+coord_value_t
 index_coord(Coordinate *coord, Cube *cube, Trans *offtrans)
 {
-	uint64_t c[2], cnosym;
+	coord_value_t c[2], cnosym;
 	Trans ttr;
 
 	switch (coord->type) {
@@ -243,10 +243,10 @@ index_coord(Coordinate *coord, Cube *cube, Trans *offtrans)
 	return coord->max; /* Only reached in case of error */
 }
 
-uint64_t
-move_coord(Coordinate *coord, Move m, uint64_t ind, Trans *offtrans)
+coord_value_t
+move_coord(Coordinate *coord, Move m, coord_value_t ind, Trans *offtrans)
 {
-	uint64_t i[2], M;
+	coord_value_t i[2], M;
 	Trans ttr;
 
 	/* Some safety checks should be done here, but for performance   *
@@ -286,10 +286,10 @@ move_coord(Coordinate *coord, Move m, uint64_t ind, Trans *offtrans)
 	return coord->max; /* Only reached in case of error */
 }
 
-uint64_t
-trans_coord(Coordinate *coord, Trans t, uint64_t ind)
+coord_value_t
+trans_coord(Coordinate *coord, Trans t, coord_value_t ind)
 {
-	uint64_t i[2], M;
+	coord_value_t i[2], M;
 
 	/* Some safety checks should be done here, but for performance   *
 	 * reasons we'd rather do them before calling this function.     *
@@ -316,7 +316,7 @@ trans_coord(Coordinate *coord, Trans t, uint64_t ind)
 size_t
 ptablesize(Coordinate *coord)
 {
-	uint64_t e;
+	coord_value_t e;
 
 	e = coord->compact ? ENTRIES_PER_GROUP_COMPACT : ENTRIES_PER_GROUP;
 
@@ -324,11 +324,11 @@ ptablesize(Coordinate *coord)
 }
 
 void
-ptableupdate(Coordinate *coord, uint64_t ind, int n)
+ptableupdate(Coordinate *coord, coord_value_t ind, int n)
 {
 	int sh;
 	entry_group_t mask;
-	uint64_t i;
+	coord_value_t i;
 
 	if (ptableval(coord, ind) <= n)
 		return;
@@ -343,10 +343,10 @@ ptableupdate(Coordinate *coord, uint64_t ind, int n)
 }
 
 int
-ptableval(Coordinate *coord, uint64_t ind)
+ptableval(Coordinate *coord, coord_value_t ind)
 {
 	int ret, j, sh;
-	uint64_t e, ii;
+	coord_value_t e, ii;
 
 	if (coord->compact) {
 		e  = ENTRIES_PER_GROUP_COMPACT;

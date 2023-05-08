@@ -1,7 +1,7 @@
 #define MAX_N_COORD 3
 
 typedef enum { NORMAL, INVERSE, NISS } SolutionType;
-typedef struct { uint64_t val; Trans t; } CubeState;
+typedef struct { coord_value_t val; Trans t; } CubeState;
 typedef struct {
 	char *shortname;
 	Moveset *moveset;

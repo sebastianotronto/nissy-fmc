@@ -14,7 +14,7 @@ static void gen_coord_comp(Coordinate *);
 static void gen_coord_sym(Coordinate *);
 static void gen_ptable(Coordinate *);
 static void gen_ptable_bfs(Coordinate *, int);
-static void gen_ptable_fixnasty(Coordinate *, uint64_t, int);
+static void gen_ptable_fixnasty(Coordinate *, coord_value_t, int);
 static void gen_ptable_compress(Coordinate *);
 static void gen_ptable_setbase(Coordinate *);
 
@@ -23,7 +23,7 @@ static char buf[TABLESFILESIZE];
 static void
 gen_coord_comp(Coordinate *coord)
 {
-	uint64_t ui;
+	coord_value_t ui;
 	Cube c, mvd;
 	Move m;
 	Trans t;
@@ -32,13 +32,13 @@ gen_coord_comp(Coordinate *coord)
 
 	coord->max = indexers_getmax(coord->i);
 
-	fprintf(stderr, "%s: size is %" PRIu64 "\n", coord->name, coord->max);
+	fprintf(stderr, "%s: size is %" PRIu32 "\n", coord->name, coord->max);
 
 	fprintf(stderr, "%s: generating mtable\n", coord->name);
 	alloc_mtable(coord);
 	for (ui = 0; ui < coord->max; ui++) {
 		if (ui % 100000 == 0)
-			fprintf(stderr, "\t(%" PRIu64 " done)\n", ui);
+			fprintf(stderr, "\t(%" PRIu32 " done)\n", ui);
 		indexers_makecube(coord->i, ui, &c);
 		for (m = 0; m < NMOVES_HTM; m++) {
 			copy_cube(&c, &mvd);
@@ -46,13 +46,13 @@ gen_coord_comp(Coordinate *coord)
 			coord->mtable[m][ui] = indexers_getind(coord->i, &mvd);
 		}
 	}
-	fprintf(stderr, "\t(%" PRIu64 " done)\n", coord->max);
+	fprintf(stderr, "\t(%" PRIu32 " done)\n", coord->max);
 
 	fprintf(stderr, "%s: generating ttable\n", coord->name);
 	alloc_ttable(coord);
 	for (ui = 0; ui < coord->max; ui++) {
 		if (ui % 100000 == 0)
-			fprintf(stderr, "\t(%" PRIu64 " done)\n", ui);
+			fprintf(stderr, "\t(%" PRIu32 " done)\n", ui);
 		indexers_makecube(coord->i, ui, &c);
 		for (t = 0; t < NTRANS; t++) {
 			copy_cube(&c, &mvd);
@@ -60,13 +60,13 @@ gen_coord_comp(Coordinate *coord)
 			coord->ttable[t][ui] = indexers_getind(coord->i, &mvd);
 		}
 	}
-	fprintf(stderr, "\t(%" PRIu64 " done)\n", coord->max);
+	fprintf(stderr, "\t(%" PRIu32 " done)\n", coord->max);
 }
 
 static void
 gen_coord_sym(Coordinate *coord)
 {
-	uint64_t i, in, ui, uj, uu, nr;
+	coord_value_t i, in, ui, uj, uu, nr;
 	int j;
 	Move m;
 	Trans t;
@@ -84,13 +84,13 @@ gen_coord_sym(Coordinate *coord)
 
 		coord->symrep[nr] = i;
 		coord->transtorep[i] = uf;
-		coord->selfsim[nr] = (uint64_t)0;
+		coord->selfsim[nr] = (coord_value_t)0;
 		for (j = 0; j < coord->tgrp->n; j++) {
 			t = coord->tgrp->t[j];
 			in = trans_coord(coord->base[0], t, i);
 			coord->symclass[in] = nr;
 			if (in == i)
-				coord->selfsim[nr] |= ((uint64_t)1<<t);
+				coord->selfsim[nr] |= ((coord_value_t)1<<t);
 			else
 				coord->transtorep[in] = inverse_trans(t);
 		}
@@ -99,14 +99,14 @@ gen_coord_sym(Coordinate *coord)
 
 	coord->max = nr;
 
-	fprintf(stderr, "%s: number of classes is %" PRIu64 "\n",
+	fprintf(stderr, "%s: number of classes is %" PRIu32 "\n",
 	    coord->name, coord->max);
 
 	/* Reallocating for maximum number of classes found */
 	/* TODO: remove, not needed anymore because not writing to file */
 	/*
-	coord->symrep = realloc(coord->symrep, coord->max*sizeof(uint64_t));
-	coord->selfsim = realloc(coord->selfsim, coord->max*sizeof(uint64_t));
+	coord->symrep = realloc(coord->symrep, coord->max*sizeof(coord_value_t));
+	coord->selfsim = realloc(coord->selfsim, coord->max*sizeof(coord_value_t));
 	*/
 
 	fprintf(stderr, "%s: generating mtable and ttrep_move\n", coord->name);
@@ -114,7 +114,7 @@ gen_coord_sym(Coordinate *coord)
 	alloc_ttrep_move(coord);
 	for (ui = 0; ui < coord->max; ui++) {
 		if (ui % 100000 == 0)
-			fprintf(stderr, "\t(%" PRIu64 " done)\n", ui);
+			fprintf(stderr, "\t(%" PRIu32 " done)\n", ui);
 		uu = coord->symrep[ui];
 		for (m = 0; m < NMOVES_HTM; m++) {
 			uj = move_coord(coord->base[0], m, uu, NULL);
@@ -122,7 +122,7 @@ gen_coord_sym(Coordinate *coord)
 			coord->ttrep_move[m][ui] = coord->transtorep[uj];
 		}
 	}
-	fprintf(stderr, "\t(%" PRIu64 " done)\n", coord->max);
+	fprintf(stderr, "\t(%" PRIu32 " done)\n", coord->max);
 }
 
 void
@@ -179,7 +179,7 @@ gen_ptable(Coordinate *coord)
 {
 	bool compact;
 	int d, i;
-	uint64_t oldn, sz;
+	coord_value_t oldn, sz;
 
 	alloc_ptable(coord, true);
 
@@ -199,14 +199,14 @@ gen_ptable(Coordinate *coord)
 	ptableupdate(coord, 0, 0);
 	gen_ptable_fixnasty(coord, 0, 0);
 	fprintf(stderr, "\tDepth %d done, generated %"
-		PRIu64 "\t(%" PRIu64 "/%" PRIu64 ")\n",
+		PRIu32 "\t(%" PRIu32 "/%" PRIu32 ")\n",
 		0, coord->updated - oldn, coord->updated, coord->max);
 	oldn = coord->updated;
 	coord->count[0] = coord->updated;
 	for (d = 0; d < 15 && coord->updated < coord->max; d++) {
 		gen_ptable_bfs(coord, d);
 		fprintf(stderr, "\tDepth %d done, generated %"
-			PRIu64 "\t(%" PRIu64 "/%" PRIu64 ")\n",
+			PRIu32 "\t(%" PRIu32 "/%" PRIu32 ")\n",
 			d+1, coord->updated-oldn, coord->updated, coord->max);
 		coord->count[d+1] = coord->updated - oldn;
 		oldn = coord->updated;
@@ -225,7 +225,7 @@ gen_ptable(Coordinate *coord)
 static void
 gen_ptable_bfs(Coordinate *coord, int d)
 {
-	uint64_t i, ii;
+	coord_value_t i, ii;
 	int pval;
 	Move m;
 
@@ -244,9 +244,9 @@ gen_ptable_bfs(Coordinate *coord, int d)
 }
 
 static void
-gen_ptable_fixnasty(Coordinate *coord, uint64_t i, int d)
+gen_ptable_fixnasty(Coordinate *coord, coord_value_t i, int d)
 {
-	uint64_t ii, ss, M;
+	coord_value_t ii, ss, M;
 	int j;
 	Trans t;
 
@@ -257,7 +257,7 @@ gen_ptable_fixnasty(Coordinate *coord, uint64_t i, int d)
 	ss = coord->base[0]->selfsim[i/M];
 	for (j = 0; j < coord->base[0]->tgrp->n; j++) {
 		t = coord->base[0]->tgrp->t[j];
-		if (t == uf || !(ss & ((uint64_t)1<<t)))
+		if (t == uf || !(ss & ((coord_value_t)1<<t)))
 			continue;
 		ii = trans_coord(coord, t, i);
 		ptableupdate(coord, ii, d);
@@ -268,7 +268,7 @@ static void
 gen_ptable_compress(Coordinate *coord)
 {
 	int val;
-	uint64_t i, j;
+	coord_value_t i, j;
 	entry_group_t mask, v;
 
 	fprintf(stderr, "Compressing table to 2 bits per entry\n");
@@ -298,7 +298,7 @@ static void
 gen_ptable_setbase(Coordinate *coord)
 {
 	int i;
-	uint64_t sum, newsum;
+	coord_value_t sum, newsum;
 
 	coord->ptablebase = 0;
 	sum = coord->count[0] + coord->count[1] + coord->count[2];
