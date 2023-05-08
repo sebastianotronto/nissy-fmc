@@ -10,6 +10,7 @@ static void append_sol(DfsArg *);
 static bool allowed_next(Move m, Move l0, Move l1);
 static void get_state(Coordinate *[], Cube *, CubeState *);
 static int lower_bound(Coordinate *[], CubeState *);
+static bool trivialshorten(DfsArg *);
 static void dfs(DfsArg *);
 static void dfs_niss(DfsArg *);
 static void dfs_move(Move, DfsArg *);
@@ -68,6 +69,21 @@ lower_bound(Coordinate *coord[], CubeState *state)
 	return ret;
 }
 
+static bool
+trivialshorten(DfsArg *arg)
+{
+	int bound;
+
+	if (!commute(arg->last[0], arg->last[1]))
+		return false;
+
+	dfs_move(inverse_move(arg->last[1]), arg);
+	bound = lower_bound(arg->s->coord, arg->state);
+	dfs_move(arg->last[1], arg);
+
+	return bound == 0;
+}
+
 static void
 dfs(DfsArg *arg)
 {
@@ -85,7 +101,7 @@ dfs(DfsArg *arg)
 	if (bound == 0) {
 		len = arg->current_alg->len == arg->d;
 		niss = !(arg->st == NISS) || arg->has_nissed;
-		if (len && niss)
+		if (len && niss && !trivialshorten(arg))
 			append_sol(arg);
 		return;
 	}
