@@ -331,5 +331,7 @@ main(void)
 	if (fwrite(buf, 1, b, file) != b)
 		return 1;
 
+	fprintf(stderr, "Written %zu bytes\n", b);
+
 	return 0;
 }
