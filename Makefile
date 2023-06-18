@@ -18,11 +18,18 @@ CC = clang
 all: nissy
 
 clean:
-	rm -rf nissy
+	rm -rf nissy nissy_flutter nissy_flutter_ffi
 
 nissy: clean
 	flutter create nissy_flutter
+	flutter create --template=plugin_ffi \
+		--platforms=linux,android,windows,macos,ios nissy_flutter_ffi
 	cp -R flutter/* nissy_flutter/
+	rm -rf nissy_flutter_ffi/src
+	cp -R flutter_ffi/* nissy_flutter_ffi/
+	cp src/* nissy_flutter_ffi/src/
+	cd nissy_flutter_ffi && \
+		flutter pub run ffigen --config ffigen.yaml
 
 debug:
 	${CC} ${DBFLAGS} -o nissy cli/*.c src/*.c

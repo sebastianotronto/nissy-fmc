@@ -93,3 +93,9 @@ nissy_solve(char *step, char *trans, int d, char *type, char *scramble, char *so
 
 	return solve(s, t, d, st, &c, sol);
 }
+
+void
+nissy_test(char *response)
+{
+	strcpy(response, "nissy is running");
+}
