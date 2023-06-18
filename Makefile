@@ -21,7 +21,8 @@ clean:
 	rm -rf nissy
 
 nissy: clean
-	${CC} ${CFLAGS} -o nissy src/*.c
+	flutter create nissy_flutter
+	cp -R flutter/* nissy_flutter/
 
 debug:
 	${CC} ${DBFLAGS} -o nissy cli/*.c src/*.c
