@@ -20,16 +20,21 @@ all: nissy
 clean:
 	rm -rf nissy nissy_flutter nissy_flutter_ffi
 
-nissy: clean
+nissy_flutter:
 	flutter create nissy_flutter
+	cp -R flutter/* nissy_flutter/
+
+nissy_flutter_ffi: tables
 	flutter create --template=plugin_ffi \
 		--platforms=linux,android,windows,macos,ios nissy_flutter_ffi
-	cp -R flutter/* nissy_flutter/
 	rm -rf nissy_flutter_ffi/src
 	cp -R flutter_ffi/* nissy_flutter_ffi/
 	cp src/* nissy_flutter_ffi/src/
 	cd nissy_flutter_ffi && \
 		flutter pub run ffigen --config ffigen.yaml
+	cp tables nissy_flutter_ffi/data/
+
+nissy: clean nissy_flutter nissy_flutter_ffi
 
 debug:
 	${CC} ${DBFLAGS} -o nissy cli/*.c src/*.c
@@ -37,7 +42,7 @@ debug:
 cleantables:
 	rm -rf tables
 
-tables: cleantables
+tables:
 	${CC} ${DBFLAGS} -o buildtables build/*.c src/*.c
 	./buildtables
 	rm buildtables
