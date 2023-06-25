@@ -32,7 +32,7 @@ nissy_flutter_ffi: tables
 	cp src/* nissy_flutter_ffi/src/
 	cd nissy_flutter_ffi && \
 		flutter pub run ffigen --config ffigen.yaml
-	cp tables nissy_flutter_ffi/data/
+	cp tables nissy_flutter/data/
 
 nissy: clean nissy_flutter nissy_flutter_ffi
 

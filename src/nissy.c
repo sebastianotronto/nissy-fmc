@@ -91,7 +91,9 @@ nissy_solve(char *step, char *trans, int d, char *type, char *scramble, char *so
 	if (!set_solutiontype(type, &st)) return 4;
 	if (!apply_scramble(scramble, &c)) return 5;
 
-	return solve(s, t, d, st, &c, sol);
+	sol[0] = 'h'; sol[1] = 'e'; sol[2] = 'l'; sol[3] = 'o'; sol[5] = 0;
+	return 0;
+	//return solve(s, t, d, st, &c, sol);
 }
 
 void
