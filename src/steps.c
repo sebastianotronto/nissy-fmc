@@ -173,7 +173,10 @@ Coordinate coord_drudfin_noE_sym16 = {
 
 Coordinate *coordinates[] = {
 	&coord_eofb,
+	/*
+	TODO: remove non-eo DR step, but add / keep direct DR finish
 	&coord_eofbepos_sym16, &coord_coud, &coord_drud_sym16,
+	*/
 	/* TODO: add back all useful coordinates */
 	/*
 	&coord_cp_sym16, &coord_epos, &coord_epe,
@@ -201,7 +204,7 @@ Step drfin_drud = {
 	.coord          = {&coord_drudfin_noE_sym16, &coord_epe, NULL},
 };
 
-Step *steps[] = {&eofb_HTM, &drud_HTM, &drfin_drud, NULL};
+Step *steps[] = {&eofb_HTM, &drfin_drud, NULL};
 
 static bool
 moveset_HTM(Move m)
